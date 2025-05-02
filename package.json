@@ -1,0 +1,10 @@
+{
+  "id": "google-gemini-mod",
+  "name": "Google Gemini (modded)",
+  "version": "0.0.1",
+  "license": "MIT",
+  "config": {
+    "serviceURL": "https://gemini.google.com"
+  },
+  "defaultIcon": "https://cdn.jsdelivr.net/gh/ferdium/ferdium-recipes@main/recipes/google-gemini/icon.svg"
+}
