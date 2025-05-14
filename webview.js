@@ -1,9 +1,12 @@
 /**
  * Ferdium Recipe Webview Integration for Custom Google Gemini
- * Version: 0.0.4 (Includes append fix, paste button, and Enter key override)
+ * Version: 0.0.5 (Paste button moved right, customizable label, enhanced Enter key override)
  */
 
 module.exports = Ferdium => {
+  // --- Customizable Elements ---
+  const PASTE_BUTTON_LABEL = "📋 Paste"; // Customizable label for the paste button
+
   // --- Redirect for Workspace Users (if necessary) ---
   if (
     location.hostname === 'workspace.google.com' &&
@@ -24,19 +27,19 @@ module.exports = Ferdium => {
   const embeddedCSS = `
     /* Styles for the Gemini Snippet Toolbar (v0.1) in Ferdium */
     #gemini-snippet-toolbar-v0-1 {
-      position: fixed !important; /* Use !important to increase specificity if needed */
+      position: fixed !important;
       top: 0 !important;
       left: 26% !important; /* Adjusted for potential Ferdium sidebars */
-	  width: 60% !important;
+      width: 60% !important; /* Ensure it doesn't take full width if not desired */
       padding: 12px 12px !important;
-      z-index: 99999 !important; /* Higher z-index */
+      z-index: 99999 !important;
       display: flex !important;
-      flex-wrap: wrap !important;
+      flex-wrap: wrap !important; /* Allow items to wrap if space is tight */
       gap: 8px !important;
       align-items: center !important;
       font-family: 'Roboto', 'Arial', sans-serif !important;
       box-sizing: border-box !important;
-      background-color: rgba(40, 42, 44, 0.95) !important; /* Slightly less transparent */
+      background-color: rgba(40, 42, 44, 0.95) !important;
       border-bottom-right-radius: 16px !important;
       border-bottom-left-radius: 16px !important;
     }
@@ -56,6 +59,7 @@ module.exports = Ferdium => {
       vertical-align: middle !important;
       transition: background-color 0.2s ease, transform 0.1s ease !important;
       border: none !important;
+      flex-shrink: 0; /* Prevent buttons from shrinking too much */
     }
 
     #gemini-snippet-toolbar-v0-1 select {
@@ -77,12 +81,16 @@ module.exports = Ferdium => {
     #gemini-snippet-toolbar-v0-1 button:hover,
     #gemini-snippet-toolbar-v0-1 select:hover {
       background-color: #4a4e51 !important;
-      /* border-color: #7c8186 !important; */ /* Border removed, so this is not needed */
     }
 
     #gemini-snippet-toolbar-v0-1 button:active {
       background-color: #5f6368 !important;
       transform: scale(0.98) !important;
+    }
+
+    /* Style for the paste button to be pushed to the right */
+    #gemini-snippet-toolbar-v0-1 .paste-button-class { /* Added a class for more specific styling if needed */
+        margin-left: auto !important;
     }
   `; // End of embeddedCSS
 
@@ -139,15 +147,11 @@ module.exports = Ferdium => {
     try {
       const range = document.createRange();
       const sel = window.getSelection();
-      // Select all content within the element
       range.selectNodeContents(element);
-      // Collapse the range to the end point.
-      // true collapses to the start, false collapses to the end.
-      range.collapse(false);
-      // Remove any existing selections
+      range.collapse(false); // false collapses to the end
       sel.removeAllRanges();
-      // Add the new collapsed range, effectively placing the cursor at the end
       sel.addRange(range);
+      element.focus(); // Ensure focus after moving cursor
     } catch (e) {
       console.error("Ferdium Gemini Recipe: Error setting cursor position:", e);
     }
@@ -168,17 +172,18 @@ module.exports = Ferdium => {
     for (const selector of selectorsToTry) {
       const element = document.querySelector(selector);
       if (element) {
-        // If we found .ql-editor, try to get the <p> inside it.
-        // Gemini often uses a <p> tag inside .ql-editor for the actual text.
         if (element.classList.contains('ql-editor')) {
           const pInEditor = element.querySelector('p');
           if (pInEditor) {
-            targetInputElement = pInEditor;
+            targetInputElement = pInEditor; // Prefer the paragraph
             break;
           }
+          // If no 'p' but '.ql-editor' is found, use it.
+          targetInputElement = element;
+          break;
         }
-        targetInputElement = element;
-        break; // Stop searching once a target is found
+        targetInputElement = element; // For other selectors like 'div[contenteditable="true"]'
+        break;
       }
     }
     return targetInputElement;
@@ -190,73 +195,57 @@ module.exports = Ferdium => {
    * @param {string} textToInsert - The text snippet to insert.
    */
   function insertSnippetText(textToInsert) {
-    let targetInputElement = findTargetInputElement();
-    let targetParagraphElement = null;
-
-    // Refine target if it's .ql-editor to ensure we operate on the paragraph if it exists
-    if (targetInputElement && targetInputElement.classList.contains('ql-editor')) {
-        const p = targetInputElement.querySelector('p');
-        if (p) {
-            targetParagraphElement = p;
-            targetInputElement = p; // Prefer the paragraph for insertion
-        } else {
-            // If no 'p' exists, we might need to create it or ensure text goes into .ql-editor directly
-            console.warn("Ferdium Gemini Recipe: No 'p' tag found inside .ql-editor for insertion. Will use .ql-editor itself.");
-        }
-    } else if (targetInputElement && targetInputElement.tagName === 'P') {
-        targetParagraphElement = targetInputElement;
-    }
-
+    let targetInputElement = findTargetInputElement(); // This will find .ql-editor or .ql-editor p
+    let actualInsertionPoint = targetInputElement;
 
     if (targetInputElement) {
-      targetInputElement.focus();
-
-      setTimeout(() => {
-        moveCursorToEnd(targetInputElement);
-
-        let insertedViaExec = false;
-        try {
-          insertedViaExec = document.execCommand('insertText', false, textToInsert);
-        } catch (e) {
-          console.warn("Ferdium Gemini Recipe: execCommand('insertText') threw an error:", e);
-          insertedViaExec = false;
+        // If the target is .ql-editor, we want to ensure text goes into a <p> tag if possible
+        if (targetInputElement.classList.contains('ql-editor')) {
+            let p = targetInputElement.querySelector('p');
+            if (!p) { // If no <p> exists, create one
+                p = document.createElement('p');
+                // If the editor is completely empty, Gemini might add its own <p><br></p> on first input.
+                // For now, we'll append our own.
+                targetInputElement.appendChild(p);
+                console.log("Ferdium Gemini Recipe: Created new 'p' tag inside .ql-editor for insertion.");
+            }
+            actualInsertionPoint = p; // Insert into the paragraph
         }
+        
+        actualInsertionPoint.focus();
 
-        if (!insertedViaExec) {
-          console.warn("Ferdium Gemini Recipe: execCommand('insertText') failed. Using fallback append.");
-          let elementToAppendTo = targetParagraphElement || targetInputElement;
+        setTimeout(() => {
+            moveCursorToEnd(actualInsertionPoint);
 
-          if (elementToAppendTo.classList.contains('ql-editor') && !elementToAppendTo.querySelector('p')) {
-            const newP = document.createElement('p');
-            // Add a zero-width space if it's empty, sometimes helps with focus/editing
-            // Or, if the editor is truly empty, Gemini might initialize its own <p> on input.
-            // For appending, it's safer to ensure the text goes into the existing flow.
-            // If newP.innerHTML is empty, textContent += will work fine.
-            elementToAppendTo.appendChild(newP);
-            elementToAppendTo = newP;
-            console.log("Ferdium Gemini Recipe: Created new 'p' tag for appending within .ql-editor.");
-          }
+            let insertedViaExec = false;
+            try {
+                // execCommand should insert at the current cursor position (which is now at the end)
+                insertedViaExec = document.execCommand('insertText', false, textToInsert);
+            } catch (e) {
+                console.warn("Ferdium Gemini Recipe: execCommand('insertText') threw an error:", e);
+                insertedViaExec = false;
+            }
 
-          // If the element is a div (like .ql-editor) and has no text,
-          // or if it's a p, just append.
-          // If it's a p and it's empty, ensure it's not just a <br> placeholder from Gemini
-          if (elementToAppendTo.innerHTML === '<br>') {
-            elementToAppendTo.innerHTML = ''; // Clear the placeholder <br>
-          }
-          elementToAppendTo.textContent += textToInsert;
-          moveCursorToEnd(elementToAppendTo);
-        }
+            if (!insertedViaExec) {
+                console.warn("Ferdium Gemini Recipe: execCommand('insertText') failed. Using fallback append.");
+                if (actualInsertionPoint.innerHTML === '<br>') { // Clear placeholder <br> if it exists
+                    actualInsertionPoint.innerHTML = '';
+                }
+                actualInsertionPoint.textContent += textToInsert;
+                moveCursorToEnd(actualInsertionPoint); // Ensure cursor is at the very end after manual append
+            }
 
-        // Dispatch events on the main editor div if possible, or the target itself
-        const editorDiv = document.querySelector('.ql-editor') || targetInputElement;
-        editorDiv.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-        editorDiv.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
-
-        console.log("Ferdium Gemini Recipe: Snippet inserted.");
-      }, 50); // 50ms delay
+            // Dispatch events on the main editor div or the most relevant input element
+            const editorToDispatchOn = document.querySelector('.ql-editor') || targetInputElement;
+            if (editorToDispatchOn) {
+                editorToDispatchOn.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                editorToDispatchOn.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+            }
+            console.log("Ferdium Gemini Recipe: Snippet inserted.");
+        }, 50);
 
     } else {
-      console.error("Ferdium Gemini Recipe: Could not find the Gemini input field for snippet insertion.");
+        console.error("Ferdium Gemini Recipe: Could not find the Gemini input field for snippet insertion.");
     }
   }
 
@@ -267,7 +256,7 @@ module.exports = Ferdium => {
     try {
       if (!navigator.clipboard || !navigator.clipboard.readText) {
         console.warn("Ferdium Gemini Recipe: Clipboard API not available or readText not supported.");
-        alert("Clipboard access is not available or not permitted in this browser/context."); // User-friendly message
+        alert("Clipboard access is not available or not permitted in this browser/context.");
         return;
       }
       const text = await navigator.clipboard.readText();
@@ -278,7 +267,6 @@ module.exports = Ferdium => {
       }
     } catch (err) {
       console.error('Ferdium Gemini Recipe: Failed to read clipboard contents: ', err);
-      // Notify the user if permission was denied or another error occurred
       if (err.name === 'NotAllowedError') {
         alert('Permission to read clipboard was denied. Please allow clipboard access in your browser settings or when prompted.');
       } else {
@@ -292,41 +280,51 @@ module.exports = Ferdium => {
    * Enter will insert a newline, Shift+Enter will behave as default (usually also newline).
    */
   function setupEnterKeyOverride() {
-    // Try to find the input field repeatedly until it's found, as it might be dynamically loaded.
     let attempts = 0;
-    const maxAttempts = 20; // Try for 10 seconds (20 * 500ms)
+    const maxAttempts = 30; // Try for 15 seconds (30 * 500ms)
     const intervalId = setInterval(() => {
-        const targetInputElement = findTargetInputElement(); // Use the refined finder
+        const targetInputElement = findTargetInputElement(); // This should find .ql-editor p or .ql-editor
 
         if (targetInputElement) {
-            clearInterval(intervalId); // Stop trying once found
-            console.log("Ferdium Gemini Recipe: Gemini input field found for Enter key override.", targetInputElement);
+            clearInterval(intervalId);
+            console.log("Ferdium Gemini Recipe: Gemini input field found for Enter key override:", targetInputElement);
 
+            // It's crucial this listener is on the element that receives key events before they are processed for sending.
+            // This is typically the contenteditable element itself.
             targetInputElement.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                    event.preventDefault(); // Prevent default action (e.g., sending message)
+                // Check for Enter or NumpadEnter, and ensure Shift key is not pressed
+                if ((event.key === 'Enter' || event.code === 'NumpadEnter') && !event.shiftKey) {
+                    console.log("Ferdium Gemini Recipe: Enter/NumpadEnter pressed without Shift.");
+                    event.preventDefault();    // Prevent default action (e.g., sending message)
+                    event.stopPropagation(); // Stop event from bubbling up or being captured by other listeners
 
                     // Insert a line break.
-                    // Using insertHTML with <br> is often reliable for contenteditable divs.
-                    // For Quill editor (.ql-editor), it typically handles <br> correctly.
-                    document.execCommand('insertHTML', false, '<br>');
+                    // execCommand('insertHTML', false, '<br>') is generally reliable for contenteditable.
+                    // execCommand('insertLineBreak') is an alternative but sometimes less consistent across browsers/editors.
+                    if (document.queryCommandSupported('insertHTML')) {
+                        document.execCommand('insertHTML', false, '<br>');
+                    } else {
+                        // Fallback if insertHTML is not supported (highly unlikely for modern browsers)
+                        document.execCommand('insertText', false, '\n');
+                    }
 
-                    // Dispatch input event to ensure Gemini recognizes the change
+
+                    // Dispatch input event to ensure Gemini (and Quill) recognizes the change
+                    // It's important to dispatch this on the element that Quill is watching,
+                    // which is typically the .ql-editor div or the <p> within it.
                     targetInputElement.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-
-                    console.log("Ferdium Gemini Recipe: Enter pressed, inserted line break.");
+                    console.log("Ferdium Gemini Recipe: Line break inserted.");
                 }
-                // If Shift+Enter is pressed, do nothing and let the default behavior occur.
             });
-            console.log("Ferdium Gemini Recipe: Enter key override is active.");
+            console.log("Ferdium Gemini Recipe: Enter key override is active on element:", targetInputElement);
         } else {
             attempts++;
             if (attempts >= maxAttempts) {
-                clearInterval(intervalId); // Stop trying after max attempts
+                clearInterval(intervalId);
                 console.warn("Ferdium Gemini Recipe: Could not find Gemini input field for Enter key override after multiple attempts.");
             }
         }
-    }, 500); // Check every 500ms
+    }, 500);
   }
 
 
@@ -343,14 +341,6 @@ module.exports = Ferdium => {
 
     const toolbar = document.createElement('div');
     toolbar.id = toolbarId;
-
-    // --- Create "Paste from Clipboard" Button ---
-    const pasteButton = document.createElement('button');
-    pasteButton.textContent = "Paste";
-    pasteButton.title = "Paste from Clipboard";
-    pasteButton.addEventListener('click', handlePasteButtonClick);
-    toolbar.appendChild(pasteButton);
-
 
     // --- Create Buttons from buttonSnippets ---
     buttonSnippets.forEach(snippet => {
@@ -394,12 +384,21 @@ module.exports = Ferdium => {
       }
     });
 
+    // --- Create "Paste from Clipboard" Button ---
+    // This button will be pushed to the right due to its style/class
+    const pasteButton = document.createElement('button');
+    pasteButton.textContent = PASTE_BUTTON_LABEL; // Use the customizable label
+    pasteButton.title = "Paste from Clipboard";
+    pasteButton.className = 'paste-button-class'; // Apply class for styling (margin-left: auto)
+    // Alternatively, directly: pasteButton.style.marginLeft = 'auto';
+    pasteButton.addEventListener('click', handlePasteButtonClick);
+    toolbar.appendChild(pasteButton); // Append it as the last child for flex order
+
     // --- Insert Toolbar into the DOM ---
     if (document.body) {
       document.body.insertBefore(toolbar, document.body.firstChild);
       console.log("Ferdium Gemini Recipe: Toolbar inserted.");
     } else {
-      // This case should be rare if called on window.load, but good to have a fallback.
       document.addEventListener('DOMContentLoaded', () => {
           if(document.body) {
             document.body.insertBefore(toolbar, document.body.firstChild);
@@ -414,10 +413,10 @@ module.exports = Ferdium => {
   // --- Initialization Logic ---
   window.addEventListener('load', () => {
     injectCustomCSS();
-    setTimeout(() => { // Slight delay to ensure Gemini's UI might be more ready
+    setTimeout(() => {
         createToolbar();
-        setupEnterKeyOverride(); // Initialize the Enter key override
-    }, 500); // Increased delay slightly
+        setupEnterKeyOverride();
+    }, 750); // Slightly increased delay to give Gemini UI more time to settle
   });
 
 }; // End of module.exports
