@@ -1,6 +1,6 @@
 /**
  * Ferdium Recipe Webview Integration for Custom Google Gemini
- * Version: 0.0.16 (Attempt to access Monaco Editor API for full content, refined fallbacks)
+ * Version: 0.0.18 (Updated canvas copy button selector based on user's specific CSS path)
  * Author: Adromir (Original script by user, download feature added)
  */
 
@@ -255,47 +255,47 @@ module.exports = Ferdium => {
   const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "h2.title-text.gds-title-s"; 
   const GEMINI_CANVAS_TITLE_BAR_SELECTOR = "div.toolbar.has-title"; 
 
-  // Selector for the xap-code-editor component itself, relative to GEMINI_CANVAS_WRAPPER_SELECTOR
-  const GEMINI_XAP_CODE_EDITOR_SELECTOR = `
-    code-immersive-panel.ng-star-inserted > 
-    div.container > 
-    xap-code-editor.ng-untouched.ng-pristine.ng-valid.ng-star-inserted
-  `.replace(/\s+/g, ' ').trim();
-
-  // Selector for the scrollable content area within xap-code-editor, relative to GEMINI_CANVAS_WRAPPER_SELECTOR
-  // Used for fallback if Monaco API access fails.
-  const GEMINI_MONACO_SCROLLABLE_CONTENT_SELECTOR = `
-    code-immersive-panel.ng-star-inserted > 
-    div.container > 
-    xap-code-editor.ng-untouched.ng-pristine.ng-valid.ng-star-inserted > 
-    div.xap-monaco-container > 
-    div.monaco-editor.no-user-select.showUnused.showDeprecated.vs-dark > 
-    div.overflow-guard > 
-    div.monaco-scrollable-element.editor-scrollable.vs-dark
-  `.replace(/\s+/g, ' ').trim();
-
-  const MONACO_EDITOR_LINE_CLASS = ".view-line";
+  // Selector for the "Copy to Clipboard" button within the canvas, derived from user's specific CSS path.
+  // This selector is relative to the GEMINI_CANVAS_WRAPPER_SELECTOR.
+  const GEMINI_CANVAS_COPY_BUTTON_SELECTOR = "code-immersive-panel.ng-star-inserted copy-button.ng-star-inserted button.copy-button";
 
 
   /**
    * Sanitizes a string to be used as a valid filename.
+   * Recognizes common extensions in the input name.
    * @param {string} name - The original filename string.
-   * @param {string} extension - The file extension to append.
+   * @param {string} defaultExtension - The default extension if none is found.
    * @returns {string} A sanitized filename.
    */
-  function sanitizeFilename(name, extension = DEFAULT_DOWNLOAD_EXTENSION) {
+  function sanitizeFilename(name, defaultExtension = "txt") {
     if (!name || typeof name !== 'string') {
       name = 'downloaded_content';
     }
-    let sanitized = name.replace(/[<>:"/\\|?*]+/g, '_');
-    sanitized = sanitized.replace(/\s+/g, '_');
-    sanitized = sanitized.replace(/__+/g, '_');
-    sanitized = sanitized.replace(/^_+|_+$/g, '');
-    sanitized = sanitized.trim();
-    if (!sanitized) {
-      sanitized = 'downloaded_content';
+    let baseName = name;
+    let extension = defaultExtension;
+
+    // Regex to find common extensions at the end of the string
+    const commonExtensionsRegex = /\.(js|html|css|py|md|txt|json|xml|yaml|sh|bat|ps1|java|c|cpp|h|hpp|cs|go|rb|php|swift|kt|kts|dart|rs|lua|pl|sql|r|ipynb)$/i;
+    const match = name.match(commonExtensionsRegex);
+
+    if (match && match[1]) {
+      // Found a common extension
+      extension = match[1].toLowerCase(); // Use the found extension
+      baseName = name.substring(0, name.lastIndexOf(match[0])); // Get the part before the extension
     }
-    return `${sanitized}.${extension}`;
+
+    // Sanitize the base name
+    let sanitizedBase = baseName.replace(/[<>:"/\\|?*~]+/g, '_'); // Added ~ to invalid chars
+    sanitizedBase = sanitizedBase.replace(/\s+/g, '_');
+    sanitizedBase = sanitizedBase.replace(/__+/g, '_');
+    sanitizedBase = sanitizedBase.replace(/^_+|_+$/g, ''); // Remove leading/trailing underscores
+    sanitizedBase = sanitizedBase.replace(/^\.+|\.+$/g, ''); // Remove leading/trailing dots
+    sanitizedBase = sanitizedBase.trim();
+
+    if (!sanitizedBase) {
+      sanitizedBase = 'downloaded_content';
+    }
+    return `${sanitizedBase}.${extension}`;
   }
 
   /**
@@ -323,154 +323,74 @@ module.exports = Ferdium => {
   }
 
   /**
-   * Extracts text content from the Monaco editor area.
-   * Attempts to access Monaco Editor API first, then falls back to DOM scraping.
-   * @param {Element} canvasElement - The main canvas wrapper element.
-   * @returns {string} The extracted text content.
-   */
-  function extractMonacoEditorContent(canvasElement) {
-    if (!canvasElement) return "";
-
-    let editorContent = "";
-    const xapEditorElement = canvasElement.querySelector(GEMINI_XAP_CODE_EDITOR_SELECTOR);
-    
-    if (xapEditorElement) {
-      console.log("Ferdium Gemini Recipe: Found xap-code-editor element:", xapEditorElement);
-      // Try to access a potential Monaco editor instance.
-      // Common property names for editor instances: _editor, editor, monacoEditor, editorInstance
-      // This is highly dependent on how xap-code-editor exposes its underlying Monaco instance.
-      const potentialInstanceKeys = ['_editor', 'editor', 'monacoEditor', 'editorInstance', '__quill']; // Added __quill as another common one
-      let editorInstance = null;
-
-      for (const key of potentialInstanceKeys) {
-        if (xapEditorElement[key] && typeof xapEditorElement[key].getModel === 'function') {
-          editorInstance = xapEditorElement[key];
-          console.log(`Ferdium Gemini Recipe: Found Monaco instance via key "${key}".`);
-          break;
-        }
-      }
-      
-      // Check if Angular component instance is available (less likely to have direct editor model)
-      if (!editorInstance && typeof ng !== 'undefined' && ng.getComponent) {
-        try {
-            const angularComponentInstance = ng.getComponent(xapEditorElement);
-            if (angularComponentInstance) {
-                console.log("Ferdium Gemini Recipe: Found Angular component instance for xap-code-editor:", angularComponentInstance);
-                // Look for editor model within the Angular component
-                for (const key of potentialInstanceKeys) {
-                    if (angularComponentInstance[key] && typeof angularComponentInstance[key].getModel === 'function') {
-                        editorInstance = angularComponentInstance[key];
-                        console.log(`Ferdium Gemini Recipe: Found Monaco instance via Angular component key "${key}".`);
-                        break;
-                    }
-                }
-                // Specific check for a common pattern if the component itself is the editor
-                if (!editorInstance && typeof angularComponentInstance.getModel === 'function') {
-                     editorInstance = angularComponentInstance;
-                     console.log(`Ferdium Gemini Recipe: Angular component itself seems to be the Monaco instance.`);
-                }
-            }
-        } catch (e) {
-            console.warn("Ferdium Gemini Recipe: Error trying to get Angular component for xap-code-editor:", e);
-        }
-      }
-
-
-      if (editorInstance && typeof editorInstance.getModel === 'function') {
-        try {
-          const model = editorInstance.getModel();
-          if (model && typeof model.getValue === 'function') {
-            editorContent = model.getValue();
-            console.log("Ferdium Gemini Recipe: Successfully extracted content via Monaco Editor API.");
-            return editorContent; // Successfully got content via API
-          } else {
-            console.warn("Ferdium Gemini Recipe: Monaco model or getValue method not found on instance.");
-          }
-        } catch (e) {
-          console.error("Ferdium Gemini Recipe: Error accessing Monaco Editor API:", e);
-        }
-      } else {
-        console.warn("Ferdium Gemini Recipe: Monaco editor instance or getModel method not found on xap-code-editor element or its component.");
-      }
-    } else {
-        console.warn("Ferdium Gemini Recipe: xap-code-editor element not found using selector:", GEMINI_XAP_CODE_EDITOR_SELECTOR);
-    }
-
-    // Fallback 1: Scrape .view-line elements from the scrollable content area
-    console.log("Ferdium Gemini Recipe: Falling back to scraping .view-line elements.");
-    const scrollableContentArea = canvasElement.querySelector(GEMINI_MONACO_SCROLLABLE_CONTENT_SELECTOR);
-    if (scrollableContentArea) {
-      const lines = scrollableContentArea.querySelectorAll(MONACO_EDITOR_LINE_CLASS);
-      if (lines && lines.length > 0) {
-        let text = "";
-        lines.forEach(line => {
-          text += (line.innerText || line.textContent || "") + '\n';
-        });
-        editorContent = text.length > 0 ? text.slice(0, -1) : "";
-        if (editorContent.trim() !== "") {
-            console.log("Ferdium Gemini Recipe: Extracted content by scraping .view-line elements.");
-            return editorContent;
-        } else {
-            console.warn("Ferdium Gemini Recipe: .view-line scraping yielded empty content.");
-        }
-      } else {
-        console.warn("Ferdium Gemini Recipe: Monaco editor lines (.view-line) not found in scrollable area. Selector:", MONACO_EDITOR_LINE_CLASS);
-      }
-    } else {
-        console.warn("Ferdium Gemini Recipe: Monaco scrollable content area not found for .view-line scraping. Selector:", GEMINI_MONACO_SCROLLABLE_CONTENT_SELECTOR);
-    }
-
-    // Fallback 2: Use innerText of the scrollable content area
-    console.log("Ferdium Gemini Recipe: Falling back to innerText of the scrollable content area.");
-    if (scrollableContentArea) {
-        editorContent = scrollableContentArea.innerText || scrollableContentArea.textContent || "";
-        if (editorContent.trim() !== "") {
-            console.log("Ferdium Gemini Recipe: Extracted content using innerText of scrollable area.");
-            return editorContent;
-        } else {
-            console.warn("Ferdium Gemini Recipe: innerText of scrollable area is empty.");
-        }
-    }
-    
-    console.error("Ferdium Gemini Recipe: All methods to extract Monaco editor content failed or yielded empty content.");
-    return ""; // Return empty if all methods fail
-  }
-
-  /**
    * Handles the click of the global canvas download button.
-   * Finds the first available canvas and triggers its download.
+   * Finds the active canvas, triggers its "Copy to Clipboard" button,
+   * then reads from clipboard and initiates download.
    */
-  function handleGlobalCanvasDownload() {
+  async function handleGlobalCanvasDownload() {
     const canvasElement = document.querySelector(GEMINI_CANVAS_WRAPPER_SELECTOR);
 
     if (!canvasElement) {
-      console.warn("Ferdium Gemini Recipe: No open canvas found to download. Wrapper selector:", GEMINI_CANVAS_WRAPPER_SELECTOR);
+      console.warn("Ferdium Gemini Recipe: No open canvas found. Wrapper selector:", GEMINI_CANVAS_WRAPPER_SELECTOR);
       Ferdium.displayErrorMessage("No active canvas found to download.");
       return;
     }
     console.log("Ferdium Gemini Recipe: Found canvas wrapper:", canvasElement);
 
-    let titleTextElement = canvasElement.querySelector(GEMINI_CANVAS_TITLE_TEXT_SELECTOR);
-    if (!titleTextElement) {
-        const titleBar = canvasElement.querySelector(GEMINI_CANVAS_TITLE_BAR_SELECTOR);
-        if (titleBar) {
-            titleTextElement = titleBar.querySelector(GEMINI_CANVAS_TITLE_TEXT_SELECTOR);
-        }
-    }
-    
-    const canvasTitle = titleTextElement ? (titleTextElement.textContent || titleTextElement.innerText || "Untitled Canvas").trim() : "Untitled Canvas";
-    const filename = sanitizeFilename(canvasTitle);
-    
-    // Pass the canvasElement to the extraction function
-    const contentToDownload = extractMonacoEditorContent(canvasElement);
+    const copyButton = canvasElement.querySelector(GEMINI_CANVAS_COPY_BUTTON_SELECTOR);
 
-    if (contentToDownload.trim() === "") {
-        console.warn("Ferdium Gemini Recipe: Canvas content area is empty after all extraction attempts. Download aborted.");
-        Ferdium.displayErrorMessage("Canvas content is empty or could not be extracted, nothing to download.");
-        return;
+    if (!copyButton) {
+      console.warn("Ferdium Gemini Recipe: 'Copy to Clipboard' button not found in canvas. Please check GEMINI_CANVAS_COPY_BUTTON_SELECTOR. Selector used within wrapper:", GEMINI_CANVAS_COPY_BUTTON_SELECTOR);
+      Ferdium.displayErrorMessage("Could not find the 'Copy to Clipboard' button in the active canvas. Please verify its selector in the recipe.");
+      return;
     }
-    triggerDownload(filename, contentToDownload);
-    console.log("Ferdium Gemini Recipe: Global download initiated for canvas:", canvasTitle);
+    console.log("Ferdium Gemini Recipe: Found 'Copy to Clipboard' button:", copyButton);
+
+    // Programmatically click the copy button
+    copyButton.click();
+    console.log("Ferdium Gemini Recipe: Programmatically clicked the 'Copy to Clipboard' button.");
+
+    // Wait a moment for the clipboard operation to complete
+    setTimeout(async () => {
+      try {
+        if (!navigator.clipboard || !navigator.clipboard.readText) {
+          console.warn("Ferdium Gemini Recipe: Clipboard API not available or readText not supported for download.");
+          Ferdium.displayErrorMessage("Clipboard access is not available. Cannot retrieve content for download.");
+          return;
+        }
+        const clipboardContent = await navigator.clipboard.readText();
+        console.log("Ferdium Gemini Recipe: Successfully read from clipboard.");
+
+        if (!clipboardContent || clipboardContent.trim() === "") {
+          console.warn("Ferdium Gemini Recipe: Clipboard is empty after copy operation.");
+          Ferdium.displayErrorMessage("Clipboard was empty after attempting to copy. Nothing to download.");
+          return;
+        }
+
+        let titleTextElement = canvasElement.querySelector(GEMINI_CANVAS_TITLE_TEXT_SELECTOR);
+        if (!titleTextElement) {
+            const titleBar = canvasElement.querySelector(GEMINI_CANVAS_TITLE_BAR_SELECTOR);
+            if (titleBar) {
+                titleTextElement = titleBar.querySelector(GEMINI_CANVAS_TITLE_TEXT_SELECTOR);
+            }
+        }
+        
+        const canvasTitle = titleTextElement ? (titleTextElement.textContent || titleTextElement.innerText || "Untitled Canvas").trim() : "Untitled Canvas";
+        const filename = sanitizeFilename(canvasTitle); // Uses the improved sanitizeFilename
+        
+        triggerDownload(filename, clipboardContent);
+        console.log("Ferdium Gemini Recipe: Global download initiated for canvas title:", canvasTitle, "using clipboard content.");
+
+      } catch (err) {
+        console.error('Ferdium Gemini Recipe: Failed to read from clipboard after copy:', err);
+        if (err.name === 'NotAllowedError') {
+          Ferdium.displayErrorMessage('Permission to read clipboard was denied. Please allow clipboard access.');
+        } else {
+          Ferdium.displayErrorMessage('Failed to read from clipboard. See console for details.');
+        }
+      }
+    }, 300); // 300ms delay, adjust if needed
+
   }
 
 
@@ -540,8 +460,8 @@ module.exports = Ferdium => {
 
     const globalDownloadButton = document.createElement('button');
     globalDownloadButton.textContent = DOWNLOAD_BUTTON_LABEL;
-    globalDownloadButton.title = "Download active canvas content";
-    globalDownloadButton.addEventListener('click', handleGlobalCanvasDownload);
+    globalDownloadButton.title = "Download active canvas content (uses canvas's copy button)";
+    globalDownloadButton.addEventListener('click', handleGlobalCanvasDownload); // Now async
     toolbar.appendChild(globalDownloadButton);
 
     if (document.body) {
