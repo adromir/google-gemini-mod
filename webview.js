@@ -1,11 +1,13 @@
 /**
  * Ferdium Recipe Webview Integration for Custom Google Gemini
- * Version: 0.0.6 (Revised Enter key override using document capture phase)
+ * Version: 0.0.13 (Moved Download button to main toolbar)
+ * Author: Adromir (Original script by user, download feature added)
  */
 
 module.exports = Ferdium => {
   // --- Customizable Elements ---
   const PASTE_BUTTON_LABEL = "📋 Paste"; // Customizable label for the paste button
+  const DOWNLOAD_BUTTON_LABEL = "💾 Download"; // Customizable label for the download button
 
   // --- Redirect for Workspace Users (if necessary) ---
   if (
@@ -88,8 +90,8 @@ module.exports = Ferdium => {
       transform: scale(0.98) !important;
     }
 
-    /* Style for the paste button to be pushed to the right */
-    #gemini-snippet-toolbar-v0-1 .paste-button-class {
+    /* Spacer to push buttons to the right */
+    .toolbar-spacer {
         margin-left: auto !important;
     }
   `; // End of embeddedCSS
@@ -98,7 +100,7 @@ module.exports = Ferdium => {
    * Injects the embedded CSS safely into the document head.
    */
   function injectCustomCSS() {
-    const styleId = 'ferdium-gemini-toolbar-styles';
+    const styleId = 'ferdium-gemini-custom-styles';
     if (document.getElementById(styleId)) return;
     try {
       const style = document.createElement('style');
@@ -247,7 +249,7 @@ module.exports = Ferdium => {
     try {
       if (!navigator.clipboard || !navigator.clipboard.readText) {
         console.warn("Ferdium Gemini Recipe: Clipboard API not available or readText not supported.");
-        alert("Clipboard access is not available or not permitted in this browser/context.");
+        Ferdium.displayErrorMessage("Clipboard access is not available or not permitted in this browser/context.");
         return;
       }
       const text = await navigator.clipboard.readText();
@@ -259,134 +261,107 @@ module.exports = Ferdium => {
     } catch (err) {
       console.error('Ferdium Gemini Recipe: Failed to read clipboard contents: ', err);
       if (err.name === 'NotAllowedError') {
-        alert('Permission to read clipboard was denied. Please allow clipboard access in your browser settings or when prompted.');
+        Ferdium.displayErrorMessage('Permission to read clipboard was denied. Please allow clipboard access in your browser settings or when prompted.');
       } else {
-        alert('Failed to paste from clipboard. See console for details.');
+        Ferdium.displayErrorMessage('Failed to paste from clipboard. See console for details.');
       }
     }
   }
   
-  // Store the intervalId globally to clear it when the field is found or max attempts are reached.
-  let enterKeyOverrideIntervalId = null; 
-  // Store reference to the input field once found
-  let geminiInputFieldForEnterKey = null;
+  // --- Canvas Download Feature ---
+  const DEFAULT_DOWNLOAD_EXTENSION = "txt"; 
+
+  // --- IMPORTANT: Canvas Selectors (used by the global download button) ---
+  const GEMINI_CANVAS_WRAPPER_SELECTOR = "immersive-panel"; 
+  const GEMINI_CANVAS_TITLE_BAR_SELECTOR = "div.toolbar.has-title"; // Relative to wrapper
+  const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "h2.title-text.gds-title-s"; // Relative to wrapper (or title bar)
+  const GEMINI_CANVAS_CONTENT_SELECTOR = "code-immersive-panel > div > xap-code-editor > div > div:nth-child(2) > div:nth-child(1) > div:nth-child(2)"; // Relative to wrapper
 
   /**
-   * The actual keydown listener that will be attached to the document.
-   * @param {KeyboardEvent} event
+   * Sanitizes a string to be used as a valid filename.
+   * @param {string} name - The original filename string.
+   * @param {string} extension - The file extension to append.
+   * @returns {string} A sanitized filename.
    */
-  const documentKeydownListener = (event) => {
-    if (!geminiInputFieldForEnterKey) return; // Should not happen if listener is attached after field is found
-
-    const activeElement = document.activeElement;
-    // Check if the event originated from our specific input field or its content.
-    const isEventTargetOurInput = geminiInputFieldForEnterKey === activeElement || geminiInputFieldForEnterKey.contains(activeElement);
-
-    if (!isEventTargetOurInput) {
-      return; // Event is not from our input field, ignore.
+  function sanitizeFilename(name, extension = DEFAULT_DOWNLOAD_EXTENSION) {
+    if (!name || typeof name !== 'string') {
+      name = 'downloaded_content';
     }
+    let sanitized = name.replace(/[<>:"/\\|?*]+/g, '_');
+    sanitized = sanitized.replace(/\s+/g, '_').replace(/__+/g, '_');
+    sanitized = sanitized.replace(/^_+|_+$/g, '').trim();
 
-    if ((event.key === 'Enter' || event.code === 'NumpadEnter') && !event.shiftKey) {
-      console.log("Ferdium Gemini Recipe (Capture): Enter/NumpadEnter pressed without Shift on target:", activeElement);
-      event.preventDefault();
-      event.stopImmediatePropagation(); // Crucial: stop other listeners and bubbling.
-
-      // Ensure the correct element within the input field has focus, especially if it's a <p>
-      let elementToInsertInto = geminiInputFieldForEnterKey;
-      if (geminiInputFieldForEnterKey.classList.contains('ql-editor')) {
-          let p = geminiInputFieldForEnterKey.querySelector('p.ql-paragraph') || geminiInputFieldForEnterKey.querySelector('p'); // More specific paragraph if possible
-          if (p && (p === activeElement || p.contains(activeElement))) {
-            elementToInsertInto = p;
-          }
-      }
-      elementToInsertInto.focus(); // Focus the element where <br> will be inserted.
-
-      // Move cursor to current position before inserting <br>
-      // This helps if Enter is pressed in the middle of a line.
-      const selection = window.getSelection();
-      if (selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0);
-          // If the cursor is inside an empty paragraph, or at the end of a line,
-          // execCommand('insertHTML', <br>) should create a new line correctly.
-          // No need to explicitly collapse if we want the break at the current caret position.
-      } else {
-          // If no selection, try to focus and move to end as a fallback (less ideal for mid-line Enter)
-          moveCursorToEnd(elementToInsertInto);
-      }
-
-      let success = false;
-      try {
-        success = document.execCommand('insertHTML', false, '<br>');
-        if (!success) {
-           console.warn("Ferdium Gemini Recipe (Capture): execCommand('insertHTML', <br>) returned false.");
-           success = document.execCommand('insertText', false, '\n'); // Fallback
-           if(!success) console.warn("Ferdium Gemini Recipe (Capture): execCommand('insertText', \\n) also returned false.");
-        }
-      } catch (e) {
-        console.error("Ferdium Gemini Recipe (Capture): Error during execCommand for line break:", e);
-        success = false;
-      }
-
-      if (success) {
-        console.log("Ferdium Gemini Recipe (Capture): Line break inserted.");
-        // Dispatch input event on the element that Quill/Gemini is watching
-        const dispatchElement = elementToInsertInto.closest('.ql-editor') || elementToInsertInto;
-        dispatchElement.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-      } else {
-        console.error("Ferdium Gemini Recipe (Capture): Failed to insert line break via execCommand.");
-      }
+    if (!sanitized) {
+      sanitized = 'downloaded_content';
     }
-  };
+    return `${sanitized}.${extension}`;
+  }
 
   /**
-   * Finds the Gemini input field and attaches the document-level keydown listener.
+   * Creates and triggers a download for the given text content.
+   * @param {string} filename - The desired filename.
+   * @param {string} content - The text content to download.
+   * @param {string} contentType - The MIME type of the content.
    */
-  function findInputAndAttachEnterListener() {
-    geminiInputFieldForEnterKey = findTargetInputElement();
-
-    if (geminiInputFieldForEnterKey) {
-      console.log("Ferdium Gemini Recipe: Gemini input field found for Enter key override:", geminiInputFieldForEnterKey);
-      
-      // Remove any existing listener to prevent duplicates if this function is called multiple times.
-      document.removeEventListener('keydown', documentKeydownListener, true); 
-      // Add the capturing event listener to the document.
-      document.addEventListener('keydown', documentKeydownListener, true); 
-
-      console.log("Ferdium Gemini Recipe: Document-level Enter key override is active (capture phase).");
-      if (enterKeyOverrideIntervalId) {
-        clearInterval(enterKeyOverrideIntervalId); // Stop polling
-        enterKeyOverrideIntervalId = null;
-      }
-    } else {
-      // console.log is in setupEnterKeyOverride's interval logging
+  function triggerDownload(filename, content, contentType = 'text/plain;charset=utf-8') {
+    try {
+      const blob = new Blob([content], { type: contentType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a); 
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      console.log(`Ferdium Gemini Recipe: Download triggered for "${filename}".`);
+    } catch (error) {
+      console.error(`Ferdium Gemini Recipe: Failed to trigger download for "${filename}":`, error);
+      Ferdium.displayErrorMessage(`Failed to download: ${error.message}`);
     }
   }
 
   /**
-   * Sets up the Enter key override for the Gemini input field by polling.
+   * Handles the click of the global canvas download button.
+   * Finds the first available canvas and triggers its download.
    */
-  function setupEnterKeyOverride() {
-    let attempts = 0;
-    const maxAttempts = 40; // Try for 20 seconds (40 * 500ms)
+  function handleGlobalCanvasDownload() {
+    const canvasElement = document.querySelector(GEMINI_CANVAS_WRAPPER_SELECTOR);
 
-    // Clear any existing interval before starting a new one.
-    if (enterKeyOverrideIntervalId) {
-        clearInterval(enterKeyOverrideIntervalId);
+    if (!canvasElement) {
+      console.warn("Ferdium Gemini Recipe: No open canvas found to download.");
+      Ferdium.displayErrorMessage("No active canvas found to download.");
+      return;
     }
 
-    enterKeyOverrideIntervalId = setInterval(() => {
-      findInputAndAttachEnterListener(); // Try to find and attach
-      attempts++;
-      console.log(`Ferdium Gemini Recipe: Attempt ${attempts}/${maxAttempts} to find input field for Enter key override.`);
-      if (geminiInputFieldForEnterKey || attempts >= maxAttempts) { // Stop if found or max attempts reached
-        clearInterval(enterKeyOverrideIntervalId);
-        enterKeyOverrideIntervalId = null;
-        if (!geminiInputFieldForEnterKey) {
-          console.warn("Ferdium Gemini Recipe: Could not find Gemini input field for Enter key override after multiple attempts.");
+    // Try to find title text directly within canvasElement, then fallback to within titleBar
+    let titleTextElement = canvasElement.querySelector(GEMINI_CANVAS_TITLE_TEXT_SELECTOR);
+    if (!titleTextElement) {
+        const titleBar = canvasElement.querySelector(GEMINI_CANVAS_TITLE_BAR_SELECTOR);
+        if (titleBar) {
+            titleTextElement = titleBar.querySelector(GEMINI_CANVAS_TITLE_TEXT_SELECTOR);
         }
-      }
-    }, 500);
-    findInputAndAttachEnterListener(); // Initial immediate attempt
+    }
+    
+    const contentArea = canvasElement.querySelector(GEMINI_CANVAS_CONTENT_SELECTOR);
+
+    if (!contentArea) {
+      console.warn("Ferdium Gemini Recipe: Canvas content area not found for the first canvas. Selector:", GEMINI_CANVAS_CONTENT_SELECTOR);
+      Ferdium.displayErrorMessage("Could not find content area in the active canvas.");
+      return;
+    }
+
+    const canvasTitle = titleTextElement ? (titleTextElement.textContent || titleTextElement.innerText || "Untitled Canvas").trim() : "Untitled Canvas";
+    const filename = sanitizeFilename(canvasTitle);
+    const contentToDownload = contentArea.innerText || contentArea.textContent || "";
+
+    if (contentToDownload.trim() === "") {
+        console.warn("Ferdium Gemini Recipe: Canvas content area is empty. Download aborted.", contentArea);
+        Ferdium.displayErrorMessage("Canvas content is empty, nothing to download.");
+        return;
+    }
+    triggerDownload(filename, contentToDownload);
+    console.log("Ferdium Gemini Recipe: Global download initiated for canvas:", canvasTitle);
   }
 
 
@@ -404,6 +379,7 @@ module.exports = Ferdium => {
     const toolbar = document.createElement('div');
     toolbar.id = toolbarId;
 
+    // Add snippet buttons
     buttonSnippets.forEach(snippet => {
       const button = document.createElement('button');
       button.textContent = snippet.label;
@@ -414,6 +390,7 @@ module.exports = Ferdium => {
       toolbar.appendChild(button);
     });
 
+    // Add dropdowns
     dropdownConfigurations.forEach(config => {
       if (config.options && config.options.length > 0) {
         const select = document.createElement('select');
@@ -443,13 +420,29 @@ module.exports = Ferdium => {
         toolbar.appendChild(select);
       }
     });
+    
+    // Add spacer to push following buttons to the right
+    const spacer = document.createElement('div');
+    spacer.className = 'toolbar-spacer';
+    toolbar.appendChild(spacer);
 
+    // Add Paste button
     const pasteButton = document.createElement('button');
     pasteButton.textContent = PASTE_BUTTON_LABEL;
     pasteButton.title = "Paste from Clipboard";
-    pasteButton.className = 'paste-button-class';
+    // pasteButton.className = 'paste-button-class'; // Class removed as spacer handles positioning
     pasteButton.addEventListener('click', handlePasteButtonClick);
     toolbar.appendChild(pasteButton);
+
+    // Add global Download Canvas button
+    const globalDownloadButton = document.createElement('button');
+    globalDownloadButton.textContent = DOWNLOAD_BUTTON_LABEL;
+    globalDownloadButton.title = "Download active canvas content";
+    // It will inherit general toolbar button styles. Add a specific class if needed.
+    // globalDownloadButton.className = 'some-specific-download-button-class'; 
+    globalDownloadButton.addEventListener('click', handleGlobalCanvasDownload);
+    toolbar.appendChild(globalDownloadButton);
+
 
     if (document.body) {
       document.body.insertBefore(toolbar, document.body.firstChild);
@@ -471,8 +464,13 @@ module.exports = Ferdium => {
     injectCustomCSS();
     setTimeout(() => {
         createToolbar();
-        setupEnterKeyOverride(); // This now starts the polling mechanism
-    }, 750);
+        // initCanvasDownloadFeature(); // This function is removed as download button is now global
+    }, 1000); 
   });
+
+  Ferdium.displayErrorMessage = Ferdium.displayErrorMessage || function(message) {
+    console.error("Ferdium Display Error:", message);
+    alert(message); 
+  };
 
 }; // End of module.exports
