@@ -1,6 +1,6 @@
 /**
  * Ferdium Recipe Webview Integration for Custom Google Gemini
- * Version: 0.0.13 (Moved Download button to main toolbar)
+ * Version: 0.0.14 (Refined content extraction from Monaco editor based on user selector)
  * Author: Adromir (Original script by user, download feature added)
  */
 
@@ -272,10 +272,33 @@ module.exports = Ferdium => {
   const DEFAULT_DOWNLOAD_EXTENSION = "txt"; 
 
   // --- IMPORTANT: Canvas Selectors (used by the global download button) ---
-  const GEMINI_CANVAS_WRAPPER_SELECTOR = "immersive-panel"; 
+  // Wrapper for the entire canvas/immersive view
+  const GEMINI_CANVAS_WRAPPER_SELECTOR = "immersive-panel.ng-tns-c1436378242-1.ng-trigger.ng-trigger-immersivePanelTransitions.ng-star-inserted"; 
+  
+  // Title text element within the canvas wrapper
+  const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "h2.title-text.gds-title-s"; 
+  // Note: This selector is searched *within* the GEMINI_CANVAS_WRAPPER_SELECTOR.
+  // If not found directly, it's also searched within the GEMINI_CANVAS_TITLE_BAR_SELECTOR.
+
+  // Title bar element (optional, used as a fallback search location for title text)
   const GEMINI_CANVAS_TITLE_BAR_SELECTOR = "div.toolbar.has-title"; // Relative to wrapper
-  const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "h2.title-text.gds-title-s"; // Relative to wrapper (or title bar)
-  const GEMINI_CANVAS_CONTENT_SELECTOR = "code-immersive-panel > div > xap-code-editor > div > div:nth-child(2) > div:nth-child(1) > div:nth-child(2)"; // Relative to wrapper
+
+  // Content area selector, derived from user's specific XPATH/CSS path.
+  // This targets the scrollable content area of the Monaco editor.
+  // Relative to GEMINI_CANVAS_WRAPPER_SELECTOR.
+  const GEMINI_CANVAS_CONTENT_SELECTOR = `
+    code-immersive-panel.ng-star-inserted > 
+    div.container > 
+    xap-code-editor.ng-untouched.ng-pristine.ng-valid.ng-star-inserted > 
+    div.xap-monaco-container > 
+    div.monaco-editor.no-user-select.showUnused.showDeprecated.vs-dark > 
+    div.overflow-guard > 
+    div.monaco-scrollable-element.editor-scrollable.vs-dark
+  `.replace(/\s+/g, ' ').trim(); // Minify selector string
+
+  // Class name for individual lines within the Monaco editor content area
+  const MONACO_EDITOR_LINE_CLASS = ".view-line";
+
 
   /**
    * Sanitizes a string to be used as a valid filename.
@@ -322,19 +345,47 @@ module.exports = Ferdium => {
   }
 
   /**
+   * Extracts text content from the Monaco editor area.
+   * Prefers extracting line by line, falls back to overall innerText.
+   * @param {Element} contentArea - The DOM element representing the Monaco editor's content.
+   * @returns {string} The extracted text content.
+   */
+  function extractMonacoEditorContent(contentArea) {
+    if (!contentArea) return "";
+
+    const lines = contentArea.querySelectorAll(MONACO_EDITOR_LINE_CLASS);
+    if (lines && lines.length > 0) {
+      let text = "";
+      lines.forEach(line => {
+        text += (line.innerText || line.textContent || "") + '\n';
+      });
+      // Remove trailing newline if text is not empty
+      return text.length > 0 ? text.slice(0, -1) : ""; 
+    } else {
+      // Fallback if specific line elements aren't found
+      console.warn("Ferdium Gemini Recipe: Monaco editor lines (.view-line) not found. Falling back to innerText of contentArea.");
+      return contentArea.innerText || contentArea.textContent || "";
+    }
+  }
+
+  /**
    * Handles the click of the global canvas download button.
    * Finds the first available canvas and triggers its download.
    */
   function handleGlobalCanvasDownload() {
+    // Use a more specific selector for the canvas wrapper if possible, based on user's path
+    // The user's path was: chat-app ... > immersive-panel.ng-tns-c1436378242-1...
+    // So, we'll use that for querying the main canvas element.
     const canvasElement = document.querySelector(GEMINI_CANVAS_WRAPPER_SELECTOR);
 
     if (!canvasElement) {
-      console.warn("Ferdium Gemini Recipe: No open canvas found to download.");
+      console.warn("Ferdium Gemini Recipe: No open canvas found to download. Wrapper selector:", GEMINI_CANVAS_WRAPPER_SELECTOR);
       Ferdium.displayErrorMessage("No active canvas found to download.");
       return;
     }
+    console.log("Ferdium Gemini Recipe: Found canvas wrapper:", canvasElement);
 
-    // Try to find title text directly within canvasElement, then fallback to within titleBar
+
     let titleTextElement = canvasElement.querySelector(GEMINI_CANVAS_TITLE_TEXT_SELECTOR);
     if (!titleTextElement) {
         const titleBar = canvasElement.querySelector(GEMINI_CANVAS_TITLE_BAR_SELECTOR);
@@ -346,17 +397,19 @@ module.exports = Ferdium => {
     const contentArea = canvasElement.querySelector(GEMINI_CANVAS_CONTENT_SELECTOR);
 
     if (!contentArea) {
-      console.warn("Ferdium Gemini Recipe: Canvas content area not found for the first canvas. Selector:", GEMINI_CANVAS_CONTENT_SELECTOR);
+      console.warn("Ferdium Gemini Recipe: Canvas content area not found for the canvas. Content selector used within wrapper:", GEMINI_CANVAS_CONTENT_SELECTOR);
       Ferdium.displayErrorMessage("Could not find content area in the active canvas.");
       return;
     }
+    console.log("Ferdium Gemini Recipe: Found content area:", contentArea);
 
     const canvasTitle = titleTextElement ? (titleTextElement.textContent || titleTextElement.innerText || "Untitled Canvas").trim() : "Untitled Canvas";
     const filename = sanitizeFilename(canvasTitle);
-    const contentToDownload = contentArea.innerText || contentArea.textContent || "";
+    
+    const contentToDownload = extractMonacoEditorContent(contentArea);
 
     if (contentToDownload.trim() === "") {
-        console.warn("Ferdium Gemini Recipe: Canvas content area is empty. Download aborted.", contentArea);
+        console.warn("Ferdium Gemini Recipe: Canvas content area is empty after extraction. Download aborted.", contentArea);
         Ferdium.displayErrorMessage("Canvas content is empty, nothing to download.");
         return;
     }
@@ -430,7 +483,6 @@ module.exports = Ferdium => {
     const pasteButton = document.createElement('button');
     pasteButton.textContent = PASTE_BUTTON_LABEL;
     pasteButton.title = "Paste from Clipboard";
-    // pasteButton.className = 'paste-button-class'; // Class removed as spacer handles positioning
     pasteButton.addEventListener('click', handlePasteButtonClick);
     toolbar.appendChild(pasteButton);
 
@@ -438,8 +490,6 @@ module.exports = Ferdium => {
     const globalDownloadButton = document.createElement('button');
     globalDownloadButton.textContent = DOWNLOAD_BUTTON_LABEL;
     globalDownloadButton.title = "Download active canvas content";
-    // It will inherit general toolbar button styles. Add a specific class if needed.
-    // globalDownloadButton.className = 'some-specific-download-button-class'; 
     globalDownloadButton.addEventListener('click', handleGlobalCanvasDownload);
     toolbar.appendChild(globalDownloadButton);
 
@@ -464,7 +514,6 @@ module.exports = Ferdium => {
     injectCustomCSS();
     setTimeout(() => {
         createToolbar();
-        // initCanvasDownloadFeature(); // This function is removed as download button is now global
     }, 1000); 
   });
 
