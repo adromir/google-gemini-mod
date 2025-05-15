@@ -1,6 +1,6 @@
 /**
  * Ferdium Recipe Webview Integration for Custom Google Gemini
- * Version: 0.0.18 (Updated canvas copy button selector based on user's specific CSS path)
+ * Version: 0.0.19 (Synced filename determination logic with userscript v0.0.4)
  * Author: Adromir (Original script by user, download feature added)
  */
 
@@ -249,54 +249,126 @@ module.exports = Ferdium => {
   
   // --- Canvas Download Feature ---
   const DEFAULT_DOWNLOAD_EXTENSION = "txt"; 
-
-  // --- IMPORTANT: Canvas Selectors (used by the global download button) ---
   const GEMINI_CANVAS_WRAPPER_SELECTOR = "immersive-panel.ng-tns-c1436378242-1.ng-trigger.ng-trigger-immersivePanelTransitions.ng-star-inserted"; 
   const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "h2.title-text.gds-title-s"; 
   const GEMINI_CANVAS_TITLE_BAR_SELECTOR = "div.toolbar.has-title"; 
-
-  // Selector for the "Copy to Clipboard" button within the canvas, derived from user's specific CSS path.
-  // This selector is relative to the GEMINI_CANVAS_WRAPPER_SELECTOR.
   const GEMINI_CANVAS_COPY_BUTTON_SELECTOR = "code-immersive-panel.ng-star-inserted copy-button.ng-star-inserted button.copy-button";
+    
+  // eslint-disable-next-line no-control-regex
+  const INVALID_FILENAME_CHARS_REGEX = /[<>:"/\\|?*\x00-\x1F]/g;
+  const RESERVED_WINDOWS_NAMES_REGEX = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
+  // General pattern for "basename.extension" where extension is 1-8 alphanumeric chars.
+  const FILENAME_WITH_EXT_REGEX = /^(.+)\.([a-zA-Z0-9]{1,8})$/;
+  // For finding such a pattern as a substring (non-greedy base, ensuring it's followed by a word boundary or end of string)
+  const SUBSTRING_FILENAME_REGEX = /([\w\s.,\-()[\\]{}'!~@#$%^&+=]+?\.([a-zA-Z0-9]{1,8}))(?=\s|$|[,.;:!?])/g;
 
 
   /**
-   * Sanitizes a string to be used as a valid filename.
-   * Recognizes common extensions in the input name.
-   * @param {string} name - The original filename string.
-   * @param {string} defaultExtension - The default extension if none is found.
-   * @returns {string} A sanitized filename.
+   * Helper function to ensure filename length does not exceed a maximum.
+   * @param {string} filename - The filename to check.
+   * @param {number} maxLength - The maximum allowed length.
+   * @returns {string} The potentially truncated filename.
    */
-  function sanitizeFilename(name, defaultExtension = "txt") {
-    if (!name || typeof name !== 'string') {
-      name = 'downloaded_content';
+  function ensureLength(filename, maxLength = 255) {
+    if (filename.length <= maxLength) {
+        return filename;
     }
-    let baseName = name;
-    let extension = defaultExtension;
-
-    // Regex to find common extensions at the end of the string
-    const commonExtensionsRegex = /\.(js|html|css|py|md|txt|json|xml|yaml|sh|bat|ps1|java|c|cpp|h|hpp|cs|go|rb|php|swift|kt|kts|dart|rs|lua|pl|sql|r|ipynb)$/i;
-    const match = name.match(commonExtensionsRegex);
-
-    if (match && match[1]) {
-      // Found a common extension
-      extension = match[1].toLowerCase(); // Use the found extension
-      baseName = name.substring(0, name.lastIndexOf(match[0])); // Get the part before the extension
+    const dotIndex = filename.lastIndexOf('.');
+    if (dotIndex === -1 || dotIndex < filename.length - 10 ) { // Arbitrary: if ext is likely > 8 chars or no dot
+        return filename.substring(0, maxLength);
     }
-
-    // Sanitize the base name
-    let sanitizedBase = baseName.replace(/[<>:"/\\|?*~]+/g, '_'); // Added ~ to invalid chars
-    sanitizedBase = sanitizedBase.replace(/\s+/g, '_');
-    sanitizedBase = sanitizedBase.replace(/__+/g, '_');
-    sanitizedBase = sanitizedBase.replace(/^_+|_+$/g, ''); // Remove leading/trailing underscores
-    sanitizedBase = sanitizedBase.replace(/^\.+|\.+$/g, ''); // Remove leading/trailing dots
-    sanitizedBase = sanitizedBase.trim();
-
-    if (!sanitizedBase) {
-      sanitizedBase = 'downloaded_content';
+    const base = filename.substring(0, dotIndex);
+    const ext = filename.substring(dotIndex);
+    const maxBaseLength = maxLength - ext.length;
+    if (maxBaseLength <= 0) {
+        return filename.substring(0, maxLength);
     }
-    return `${sanitizedBase}.${extension}`;
+    return base.substring(0, maxBaseLength) + ext;
   }
+
+  /**
+   * Sanitizes a base filename part (no extension).
+   * @param {string} baseName - The base name to sanitize.
+   * @returns {string} The sanitized base name.
+   */
+  function sanitizeBasename(baseName) {
+    if (typeof baseName !== 'string' || baseName.trim() === "") return "downloaded_document";
+    
+    let sanitized = baseName.trim()
+        .replace(INVALID_FILENAME_CHARS_REGEX, '_')
+        .replace(/\s+/g, '_')
+        .replace(/__+/g, '_')
+        .replace(/^[_.-]+|[_.-]+$/g, ''); // Remove leading/trailing problematic chars
+
+    if (!sanitized || RESERVED_WINDOWS_NAMES_REGEX.test(sanitized)) {
+        sanitized = `_${sanitized || "file"}_`; // Ensure it's not empty and not reserved
+        // Re-sanitize after modification
+        sanitized = sanitized.replace(INVALID_FILENAME_CHARS_REGEX, '_').replace(/\s+/g, '_').replace(/__+/g, '_').replace(/^[_.-]+|[_.-]+$/g, '');
+    }
+    return sanitized || "downloaded_document"; // Final fallback if sanitization results in empty string
+  }
+
+  /**
+   * Determines the filename for download based on the canvas title,
+   * prioritizing a `basename.ext` structure if found.
+   * @param {string} title - The original string (e.g., canvas title).
+   * @param {string} defaultExtension - The default extension if no structure is found.
+   * @returns {string} A processed filename.
+   */
+  function determineFilename(title, defaultExtension = "txt") {
+    const logPrefix = "Ferdium Gemini Recipe: determineFilename - "; // Changed prefix for Ferdium context
+    if (!title || typeof title !== 'string' || title.trim() === "") {
+        console.log(`${logPrefix}Input title invalid or empty, defaulting to "downloaded_document.${defaultExtension}".`);
+        return ensureLength(`downloaded_document.${defaultExtension}`);
+    }
+
+    let trimmedTitle = title.trim();
+    let baseNamePart = "";
+    let extensionPart = "";
+
+    // Attempt 1: Check if the entire trimmedTitle matches "basename.ext"
+    const fullTitleMatch = trimmedTitle.match(FILENAME_WITH_EXT_REGEX);
+    if (fullTitleMatch) {
+        const potentialBase = fullTitleMatch[1];
+        const potentialExt = fullTitleMatch[2].toLowerCase();
+        if (!INVALID_FILENAME_CHARS_REGEX.test(potentialBase.replace(/\s/g, '_'))) {
+            baseNamePart = potentialBase;
+            extensionPart = potentialExt;
+            console.log(`${logPrefix}Entire title "${trimmedTitle}" matches basename.ext. Base: "${baseNamePart}", Ext: "${extensionPart}"`);
+        }
+    }
+
+    // Attempt 2: If full title didn't match or base was invalid, find the last substring matching "basename.ext"
+    if (!extensionPart) { 
+        let lastMatch = null;
+        let currentMatch;
+        SUBSTRING_FILENAME_REGEX.lastIndex = 0; 
+        while ((currentMatch = SUBSTRING_FILENAME_REGEX.exec(trimmedTitle)) !== null) {
+            lastMatch = currentMatch;
+        }
+
+        if (lastMatch) {
+            const substringExtMatch = lastMatch[1].match(FILENAME_WITH_EXT_REGEX);
+            if (substringExtMatch) {
+                baseNamePart = substringExtMatch[1];
+                extensionPart = substringExtMatch[2].toLowerCase();
+                console.log(`${logPrefix}Found substring "${lastMatch[1]}" matching basename.ext. Base: "${baseNamePart}", Ext: "${extensionPart}"`);
+            }
+        }
+    }
+
+    // Process based on what was found
+    if (extensionPart) { 
+        const sanitizedBase = sanitizeBasename(baseNamePart);
+        return ensureLength(`${sanitizedBase}.${extensionPart}`);
+    } else {
+        // Fallback: No "basename.ext" structure found. Sanitize the whole title and use default extension.
+        console.log(`${logPrefix}No basename.ext pattern found. Sanitizing full title "${trimmedTitle}" with default extension "${defaultExtension}".`);
+        const sanitizedTitleBase = sanitizeBasename(trimmedTitle); // Sanitize the whole title as base
+        return ensureLength(`${sanitizedTitleBase}.${defaultExtension}`);
+    }
+  }
+
 
   /**
    * Creates and triggers a download for the given text content.
@@ -346,11 +418,9 @@ module.exports = Ferdium => {
     }
     console.log("Ferdium Gemini Recipe: Found 'Copy to Clipboard' button:", copyButton);
 
-    // Programmatically click the copy button
     copyButton.click();
     console.log("Ferdium Gemini Recipe: Programmatically clicked the 'Copy to Clipboard' button.");
 
-    // Wait a moment for the clipboard operation to complete
     setTimeout(async () => {
       try {
         if (!navigator.clipboard || !navigator.clipboard.readText) {
@@ -375,11 +445,11 @@ module.exports = Ferdium => {
             }
         }
         
-        const canvasTitle = titleTextElement ? (titleTextElement.textContent || titleTextElement.innerText || "Untitled Canvas").trim() : "Untitled Canvas";
-        const filename = sanitizeFilename(canvasTitle); // Uses the improved sanitizeFilename
+        const canvasTitle = titleTextElement ? (titleTextElement.textContent || "Untitled Canvas").trim() : "Untitled Canvas";
+        const filename = determineFilename(canvasTitle); 
         
         triggerDownload(filename, clipboardContent);
-        console.log("Ferdium Gemini Recipe: Global download initiated for canvas title:", canvasTitle, "using clipboard content.");
+        console.log("Ferdium Gemini Recipe: Global download initiated for canvas title:", canvasTitle, "using clipboard content. Filename:", filename);
 
       } catch (err) {
         console.error('Ferdium Gemini Recipe: Failed to read from clipboard after copy:', err);
@@ -389,7 +459,7 @@ module.exports = Ferdium => {
           Ferdium.displayErrorMessage('Failed to read from clipboard. See console for details.');
         }
       }
-    }, 300); // 300ms delay, adjust if needed
+    }, 300); 
 
   }
 
@@ -461,7 +531,7 @@ module.exports = Ferdium => {
     const globalDownloadButton = document.createElement('button');
     globalDownloadButton.textContent = DOWNLOAD_BUTTON_LABEL;
     globalDownloadButton.title = "Download active canvas content (uses canvas's copy button)";
-    globalDownloadButton.addEventListener('click', handleGlobalCanvasDownload); // Now async
+    globalDownloadButton.addEventListener('click', handleGlobalCanvasDownload); 
     toolbar.appendChild(globalDownloadButton);
 
     if (document.body) {
