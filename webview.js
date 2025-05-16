@@ -1,6 +1,6 @@
 /**
  * Ferdium Recipe Webview Integration for Custom Google Gemini
- * Version: 0.0.20 (Simplified canvas detection logic, removed redundant selectors)
+ * Version: 0.0.21 (Refined title and copy button selectors based on detailed user feedback)
  * Author: Adromir (Original script by user, download feature added)
  */
 
@@ -28,11 +28,17 @@ module.exports = Ferdium => {
   const embeddedCSS = `
     /* Styles for the Gemini Snippet Toolbar (v0.1) in Ferdium */
     #gemini-snippet-toolbar-v0-1 {
-      position: fixed !important; top: 0 !important; left: 26% !important; width: 60% !important;
-      padding: 12px 12px !important; z-index: 99999 !important; display: flex !important; flex-wrap: wrap !important;
-      gap: 8px !important; align-items: center !important; font-family: 'Roboto', 'Arial', sans-serif !important;
-      box-sizing: border-box !important; background-color: rgba(40, 42, 44, 0.95) !important;
-      border-bottom-right-radius: 16px !important; border-bottom-left-radius: 16px !important;
+          position: fixed !important; top: 0 !important; left: 50% !important; 
+          transform: translateX(-50%) !important; 
+          width: auto !important; 
+          max-width: 80% !important; 
+          padding: 10px 15px !important; 
+          z-index: 999999 !important; 
+          display: flex !important; flex-wrap: wrap !important;
+          gap: 8px !important; align-items: center !important; font-family: 'Roboto', 'Arial', sans-serif !important;
+          box-sizing: border-box !important; background-color: rgba(40, 42, 44, 0.95) !important;
+          border-radius: 0 0 16px 16px !important; 
+          box-shadow: 0 4px 12px rgba(0,0,0,0.25);
     }
     #gemini-snippet-toolbar-v0-1 button, #gemini-snippet-toolbar-v0-1 select {
       padding: 4px 10px !important; cursor: pointer !important; background-color: #202122 !important;
@@ -217,12 +223,14 @@ module.exports = Ferdium => {
   
   // --- Canvas Download Feature ---
   const DEFAULT_DOWNLOAD_EXTENSION = "txt"; 
-  // This selector now directly targets the title h2 element within an active immersive panel.
-  // It's the primary way to detect an "active canvas".
+  
+  // Selector to find the h2 title element of an active canvas.
+  // This is the primary way to detect an "active canvas".
   const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "immersive-panel.ng-tns-c1436378242-1.ng-trigger.ng-trigger-immersivePanelTransitions.ng-star-inserted code-immersive-panel > toolbar > div > div:nth-child(1) > h2.title-text.gds-title-s.ng-star-inserted"; 
   
-  // This selector is now relative to the toolbar element that will be found via the titleTextElement.
-  const GEMINI_COPY_BUTTON_IN_TOOLBAR_SELECTOR = "copy-button.ng-star-inserted button.copy-button.icon-button"; // More specific classes from user's CSS path
+  // Selector for the "Copy to Clipboard" button, relative to the toolbar element.
+  // The toolbar element is found by navigating up from the titleTextElement.
+  const GEMINI_COPY_BUTTON_IN_TOOLBAR_SELECTOR = "div.action-buttons > copy-button.ng-star-inserted > button.copy-button";
     
   // eslint-disable-next-line no-control-regex
   const INVALID_FILENAME_CHARS_REGEX = /[<>:"/\\|?*\x00-\x1F]/g;
@@ -325,7 +333,6 @@ module.exports = Ferdium => {
   }
 
   async function handleGlobalCanvasDownload() {
-    // Attempt to find the title element directly. This is now the primary check for an active canvas.
     const titleTextElement = document.querySelector(GEMINI_CANVAS_TITLE_TEXT_SELECTOR);
 
     if (!titleTextElement) {
@@ -335,13 +342,13 @@ module.exports = Ferdium => {
     }
     console.log("Ferdium Gemini Recipe: Found canvas title element:", titleTextElement);
 
-    // Try to find the toolbar element by navigating up from the title element
-    // Assumes structure: h2 -> div -> div -> toolbar -> code-immersive-panel
+    // Navigate up to the common toolbar ancestor. 
+    // Based on XPATH: .../code-immersive-panel/toolbar/div/div[1]/h2
+    // The toolbar is 3 levels up from h2 and is the <toolbar> tag itself.
     const toolbarElement = titleTextElement.closest('code-immersive-panel > toolbar'); 
-    // Alternative, more fragile: titleTextElement.parentElement.parentElement.parentElement;
 
     if (!toolbarElement) {
-        console.warn("Ferdium Gemini Recipe: Could not find parent toolbar for the title element.");
+        console.warn("Ferdium Gemini Recipe: Could not find parent toolbar for the title element. Searched for 'code-immersive-panel > toolbar' from title.");
         Ferdium.displayErrorMessage("Could not locate the toolbar for the active canvas.");
         return;
     }
@@ -349,7 +356,7 @@ module.exports = Ferdium => {
 
     const copyButton = toolbarElement.querySelector(GEMINI_COPY_BUTTON_IN_TOOLBAR_SELECTOR);
     if (!copyButton) {
-      console.warn("Ferdium Gemini Recipe: 'Copy to Clipboard' button not found within the identified toolbar. Selector used:", GEMINI_COPY_BUTTON_IN_TOOLBAR_SELECTOR);
+      console.warn("Ferdium Gemini Recipe: 'Copy to Clipboard' button not found within the identified toolbar. Selector used on toolbar:", GEMINI_COPY_BUTTON_IN_TOOLBAR_SELECTOR);
       Ferdium.displayErrorMessage("Could not find the 'Copy to Clipboard' button in the active canvas's toolbar.");
       return;
     }
