@@ -1,6 +1,6 @@
 /**
  * Ferdium Recipe Webview Integration for Custom Google Gemini
- * Version: 0.0.21 (Refined title and copy button selectors based on detailed user feedback)
+ * Version: 0.0.22 (Synced CSS styles with userscript for centered toolbar)
  * Author: Adromir (Original script by user, download feature added)
  */
 
@@ -24,31 +24,45 @@ module.exports = Ferdium => {
     localStorage.setItem('theme', isEnabled ? 'dark' : 'light');
   });
 
-  // --- Embedded CSS ---
+  // --- Embedded CSS (Synced with Userscript for centered toolbar) ---
   const embeddedCSS = `
-    /* Styles for the Gemini Snippet Toolbar (v0.1) in Ferdium */
-    #gemini-snippet-toolbar-v0-1 {
-          position: fixed !important; top: 0 !important; left: 50% !important; 
-          transform: translateX(-50%) !important; 
-          width: auto !important; 
-          max-width: 80% !important; 
-          padding: 10px 15px !important; 
-          z-index: 999999 !important; 
-          display: flex !important; flex-wrap: wrap !important;
-          gap: 8px !important; align-items: center !important; font-family: 'Roboto', 'Arial', sans-serif !important;
-          box-sizing: border-box !important; background-color: rgba(40, 42, 44, 0.95) !important;
-          border-radius: 0 0 16px 16px !important; 
-          box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    /* Styles for the Gemini Snippet Toolbar */
+    #gemini-snippet-toolbar-v0-1 { /* ID used in Ferdium webview.js */
+      position: fixed !important; 
+      top: 0 !important; 
+      left: 50% !important; /* Centered */
+      transform: translateX(-50%) !important; /* Centering trick */
+      width: auto !important; /* Auto width based on content */
+      max-width: 80% !important; /* Max width to prevent overflow on small screens */
+      padding: 10px 15px !important; 
+      z-index: 999999 !important; /* Higher z-index */
+      display: flex !important; 
+      flex-wrap: wrap !important;
+      gap: 8px !important; 
+      align-items: center !important; 
+      font-family: 'Roboto', 'Arial', sans-serif !important;
+      box-sizing: border-box !important; 
+      background-color: rgba(40, 42, 44, 0.95) !important;
+      border-radius: 0 0 16px 16px !important; /* Rounded bottom corners */
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
     }
-    #gemini-snippet-toolbar-v0-1 button, #gemini-snippet-toolbar-v0-1 select {
-      padding: 4px 10px !important; cursor: pointer !important; background-color: #202122 !important;
-      color: #e3e3e3 !important; border-radius: 16px !important; font-size: 13px !important;
-      font-family: inherit !important; font-weight: 500 !important; height: 28px !important;
-      box-sizing: border-box !important; vertical-align: middle !important;
+    #gemini-snippet-toolbar-v0-1 button, 
+    #gemini-snippet-toolbar-v0-1 select {
+      padding: 4px 10px !important; 
+      cursor: pointer !important; 
+      background-color: #202122 !important;
+      color: #e3e3e3 !important; 
+      border-radius: 16px !important; 
+      font-size: 13px !important;
+      font-family: inherit !important; 
+      font-weight: 500 !important; 
+      height: 28px !important;
+      box-sizing: border-box !important; 
+      vertical-align: middle !important;
       transition: background-color 0.2s ease, transform 0.1s ease !important;
-      border: none !important; flex-shrink: 0;
+      border: none !important; 
+      flex-shrink: 0;
     }
-
     #gemini-snippet-toolbar-v0-1 select {
       padding-right: 25px !important;
       appearance: none !important;
@@ -57,26 +71,22 @@ module.exports = Ferdium => {
       background-position: right 8px center !important;
       background-size: 12px 12px !important;
     }
-
     #gemini-snippet-toolbar-v0-1 option {
       background-color: #2a2a2a !important;
       color: #e3e3e3 !important;
       font-weight: normal !important;
       padding: 5px 10px !important;
     }
-
     #gemini-snippet-toolbar-v0-1 button:hover,
     #gemini-snippet-toolbar-v0-1 select:hover {
       background-color: #4a4e51 !important;
     }
-
     #gemini-snippet-toolbar-v0-1 button:active {
       background-color: #5f6368 !important;
       transform: scale(0.98) !important;
     }
-
-    /* Spacer to push buttons to the right */
-    .toolbar-spacer {
+    /* Spacer to push buttons to the right - ensure class name matches that used in createToolbar */
+    .toolbar-spacer { 
         margin-left: auto !important;
     }
   `; // End of embeddedCSS
@@ -223,13 +233,7 @@ module.exports = Ferdium => {
   
   // --- Canvas Download Feature ---
   const DEFAULT_DOWNLOAD_EXTENSION = "txt"; 
-  
-  // Selector to find the h2 title element of an active canvas.
-  // This is the primary way to detect an "active canvas".
   const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "immersive-panel.ng-tns-c1436378242-1.ng-trigger.ng-trigger-immersivePanelTransitions.ng-star-inserted code-immersive-panel > toolbar > div > div:nth-child(1) > h2.title-text.gds-title-s.ng-star-inserted"; 
-  
-  // Selector for the "Copy to Clipboard" button, relative to the toolbar element.
-  // The toolbar element is found by navigating up from the titleTextElement.
   const GEMINI_COPY_BUTTON_IN_TOOLBAR_SELECTOR = "div.action-buttons > copy-button.ng-star-inserted > button.copy-button";
     
   // eslint-disable-next-line no-control-regex
@@ -342,9 +346,6 @@ module.exports = Ferdium => {
     }
     console.log("Ferdium Gemini Recipe: Found canvas title element:", titleTextElement);
 
-    // Navigate up to the common toolbar ancestor. 
-    // Based on XPATH: .../code-immersive-panel/toolbar/div/div[1]/h2
-    // The toolbar is 3 levels up from h2 and is the <toolbar> tag itself.
     const toolbarElement = titleTextElement.closest('code-immersive-panel > toolbar'); 
 
     if (!toolbarElement) {
@@ -399,14 +400,14 @@ module.exports = Ferdium => {
   }
 
   function createToolbar() {
-    const toolbarId = 'gemini-snippet-toolbar-v0-1';
+    const toolbarId = 'gemini-snippet-toolbar-v0-1'; // This ID matches the CSS
     if (document.getElementById(toolbarId)) {
       console.log("Ferdium Gemini Recipe: Toolbar already exists.");
       return;
     }
     console.log("Ferdium Gemini Recipe: Initializing toolbar...");
     const toolbar = document.createElement('div');
-    toolbar.id = toolbarId;
+    toolbar.id = toolbarId; // Assign the ID for CSS styling
     buttonSnippets.forEach(snippet => {
       const button = document.createElement('button');
       button.textContent = snippet.label;
@@ -443,7 +444,7 @@ module.exports = Ferdium => {
       }
     });
     const spacer = document.createElement('div');
-    spacer.className = 'toolbar-spacer';
+    spacer.className = 'toolbar-spacer'; // Class name for the spacer div
     toolbar.appendChild(spacer);
     const pasteButton = document.createElement('button');
     pasteButton.textContent = PASTE_BUTTON_LABEL;
