@@ -1,41 +1,95 @@
 /**
  * Ferdium Recipe Webview Integration for Custom Google Gemini
- * Version: 0.0.23 (Updated title selector to absolute path based on user JS path)
+ * Version: 0.0.27 (Reorganized code structure for better readability)
  * Author: Adromir (Original script by user, download feature added)
  */
 
 module.exports = Ferdium => {
-  // --- Customizable Elements ---
+
+  // ===================================================================================
+  // I. CONFIGURATION SECTION
+  // ===================================================================================
+
+  // --- Customizable Labels for Toolbar Buttons ---
   const PASTE_BUTTON_LABEL = "📋 Paste";
   const DOWNLOAD_BUTTON_LABEL = "💾 Download Canvas as File";
 
-  // --- Redirect for Workspace Users (if necessary) ---
-  if (
-    location.hostname === 'workspace.google.com' &&
-    location.href.includes('products/gemini/')
-  ) {
-    location.href =
-      'https://accounts.google.com/AccountChooser?continue=https://gemini.google.com/u/0/';
-    return;
-  }
+  // --- CSS Selectors for DOM Elements ---
+  //    (Used by the global download button and snippet insertion)
 
-  // --- Dark Mode Handling ---
-  Ferdium.handleDarkMode(isEnabled => {
-    localStorage.setItem('theme', isEnabled ? 'dark' : 'light');
-  });
+  // Selector to find the h2 title element of an active canvas.
+  // This is the primary way to detect an "active canvas".
+  const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "#app-root > main > side-navigation-v2 > bard-sidenav-container > bard-sidenav-content > div.content-wrapper > div > div.content-container > chat-window > immersive-panel > code-immersive-panel > toolbar > div > div.left-panel > h2.title-text.gds-title-s.ng-star-inserted";
+  
+  // Selector for the "Copy to Clipboard" button, relative to the toolbar element.
+  // The toolbar element is found by navigating up from the titleTextElement.
+  const GEMINI_COPY_BUTTON_IN_TOOLBAR_SELECTOR = "div.action-buttons > copy-button.ng-star-inserted > button.copy-button";
 
-  // --- Embedded CSS (Synced with Userscript for centered toolbar) ---
+  // Selectors for the Gemini input field (for snippet insertion)
+  const GEMINI_INPUT_FIELD_SELECTORS = [
+      '.ql-editor p', 
+      '.ql-editor',   
+      'div[contenteditable="true"]' 
+  ];
+
+  // --- Download Feature Configuration ---
+  const DEFAULT_DOWNLOAD_EXTENSION = "txt"; 
+
+  // --- Regular Expressions for Filename Sanitization ---
+  // eslint-disable-next-line no-control-regex
+  const INVALID_FILENAME_CHARS_REGEX = /[<>:"/\\|?*\x00-\x1F]/g;
+  const RESERVED_WINDOWS_NAMES_REGEX = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
+  // General pattern for "basename.extension" where extension is 1-8 alphanumeric chars.
+  const FILENAME_WITH_EXT_REGEX = /^(.+)\.([a-zA-Z0-9]{1,8})$/; 
+  // For finding such a pattern as a substring (non-greedy base, ensuring it's followed by a word boundary or end of string)
+  const SUBSTRING_FILENAME_REGEX = /([\w\s.,\-()[\\]{}'!~@#$%^&+=]+?\.([a-zA-Z0-9]{1,8}))(?=\s|$|[,.;:!?])/g;
+
+
+  // ===================================================================================
+  // II. TOOLBAR ELEMENT DEFINITIONS
+  // ===================================================================================
+
+  // --- Snippet Buttons Configuration ---
+  const buttonSnippets = [
+    { label: "Greeting", text: "Hello Gemini!" },
+    { label: "Explain", text: "Could you please explain ... in more detail?" },
+  ];
+
+  // --- Dropdown Menus Configuration ---
+  const dropdownConfigurations = [
+    {
+      placeholder: "Actions...",
+      options: [
+        { label: "Summarize", text: "Please summarize the following text:\n" },
+        { label: "Ideas", text: "Give me 5 ideas for ..." },
+        { label: "Code (JS)", text: "Give me a JavaScript code example for ..." },
+      ]
+    },
+    {
+      placeholder: "Translations",
+      options: [
+        { label: "DE -> EN", text: "Translate the following into English:\n" },
+        { label: "EN -> DE", text: "Translate the following into German:\n" },
+        { label: "Correct Text", text: "Please correct the grammar and spelling in the following text:\n" }
+      ]
+    },
+  ];
+
+  // ===================================================================================
+  // III. SCRIPT LOGIC
+  // ===================================================================================
+
+  // --- Embedded CSS for the Toolbar ---
   const embeddedCSS = `
-    /* Styles for the Gemini Snippet Toolbar */
-    #gemini-snippet-toolbar-v0-1 { /* ID used in Ferdium webview.js */
+    #gemini-snippet-toolbar-v0-1 { 
       position: fixed !important; 
       top: 0 !important; 
-      left: 50% !important; /* Centered */
-      transform: translateX(-50%) !important; /* Centering trick */
-      width: auto !important; /* Auto width based on content */
-      max-width: 80% !important; /* Max width to prevent overflow on small screens */
+      left: 50% !important; 
+      transform: translateX(-50%) !important; 
+      width: auto !important; 
+      max-width: 80% !important; 
       padding: 10px 15px !important; 
-      z-index: 999999 !important; /* Higher z-index */
+      z-index: 999999 !important; 
       display: flex !important; 
       flex-wrap: wrap !important;
       gap: 8px !important; 
@@ -43,7 +97,7 @@ module.exports = Ferdium => {
       font-family: 'Roboto', 'Arial', sans-serif !important;
       box-sizing: border-box !important; 
       background-color: rgba(40, 42, 44, 0.95) !important;
-      border-radius: 0 0 16px 16px !important; /* Rounded bottom corners */
+      border-radius: 0 0 16px 16px !important; 
       box-shadow: 0 4px 12px rgba(0,0,0,0.25);
     }
     #gemini-snippet-toolbar-v0-1 button, 
@@ -85,11 +139,10 @@ module.exports = Ferdium => {
       background-color: #5f6368 !important;
       transform: scale(0.98) !important;
     }
-    /* Spacer to push buttons to the right - ensure class name matches that used in createToolbar */
     .toolbar-spacer { 
         margin-left: auto !important;
     }
-  `; // End of embeddedCSS
+  `;
 
   /**
    * Injects the embedded CSS safely into the document head.
@@ -108,31 +161,10 @@ module.exports = Ferdium => {
     }
   }
 
-  // --- Snippet Toolbar Logic ---
-  const buttonSnippets = [
-    { label: "Greeting", text: "Hello Gemini!" },
-    { label: "Explain", text: "Could you please explain ... in more detail?" },
-  ];
-
-  const dropdownConfigurations = [
-    {
-      placeholder: "Actions...",
-      options: [
-        { label: "Summarize", text: "Please summarize the following text:\n" },
-        { label: "Ideas", text: "Give me 5 ideas for ..." },
-        { label: "Code (JS)", text: "Give me a JavaScript code example for ..." },
-      ]
-    },
-    {
-      placeholder: "Translations",
-      options: [
-        { label: "DE -> EN", text: "Translate the following into English:\n" },
-        { label: "EN -> DE", text: "Translate the following into German:\n" },
-        { label: "Correct Text", text: "Please correct the grammar and spelling in the following text:\n" }
-      ]
-    },
-  ];
-
+  /**
+   * Moves the cursor to the end of the provided element's content.
+   * @param {Element} element - The contenteditable element or paragraph within it.
+   */
   function moveCursorToEnd(element) {
     try {
       const range = document.createRange();
@@ -147,14 +179,13 @@ module.exports = Ferdium => {
     }
   }
 
+  /**
+   * Finds the target Gemini input element.
+   * @returns {Element | null} The found input element or null.
+   */
   function findTargetInputElement() {
-    const selectorsToTry = [
-      '.ql-editor p', 
-      '.ql-editor',   
-      'div[contenteditable="true"]' 
-    ];
     let targetInputElement = null;
-    for (const selector of selectorsToTry) {
+    for (const selector of GEMINI_INPUT_FIELD_SELECTORS) {
       const element = document.querySelector(selector);
       if (element) {
         if (element.classList.contains('ql-editor')) {
@@ -169,6 +200,10 @@ module.exports = Ferdium => {
     return targetInputElement;
   }
 
+  /**
+   * Inserts text into the Gemini input field, always appending.
+   * @param {string} textToInsert - The text snippet to insert.
+   */
   function insertSnippetText(textToInsert) {
     let targetInputElement = findTargetInputElement();
     if (!targetInputElement) {
@@ -208,6 +243,9 @@ module.exports = Ferdium => {
     }, 50);
   }
 
+  /**
+   * Handles the paste button click. Reads from clipboard and inserts text.
+   */
   async function handlePasteButtonClick() {
     try {
       if (!navigator.clipboard || !navigator.clipboard.readText) {
@@ -231,22 +269,12 @@ module.exports = Ferdium => {
     }
   }
   
-  // --- Canvas Download Feature ---
-  const DEFAULT_DOWNLOAD_EXTENSION = "txt"; 
-  
-  // Updated selector to directly target the title h2 element using the absolute path provided by the user.
-  // This is the primary way to detect an "active canvas".
-  const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "#app-root > main > side-navigation-v2 > bard-sidenav-container > bard-sidenav-content > div.content-wrapper > div > div.content-container > chat-window > immersive-panel > code-immersive-panel > toolbar > div > div.left-panel > h2.title-text.gds-title-s.ng-star-inserted";
-  
-  // This selector is relative to the toolbar element that will be found via the titleTextElement.
-  const GEMINI_COPY_BUTTON_IN_TOOLBAR_SELECTOR = "div.action-buttons > copy-button.ng-star-inserted > button.copy-button";
-    
-  // eslint-disable-next-line no-control-regex
-  const INVALID_FILENAME_CHARS_REGEX = /[<>:"/\\|?*\x00-\x1F]/g;
-  const RESERVED_WINDOWS_NAMES_REGEX = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
-  const FILENAME_WITH_EXT_REGEX = /^(.+)\.([a-zA-Z0-9]{1,8})$/;
-  const SUBSTRING_FILENAME_REGEX = /([\w\s.,\-()[\\]{}'!~@#$%^&+=]+?\.([a-zA-Z0-9]{1,8}))(?=\s|$|[,.;:!?])/g;
-
+  /**
+   * Helper function to ensure filename length does not exceed a maximum.
+   * @param {string} filename - The filename to check.
+   * @param {number} maxLength - The maximum allowed length.
+   * @returns {string} The potentially truncated filename.
+   */
   function ensureLength(filename, maxLength = 255) {
     if (filename.length <= maxLength) {
         return filename;
@@ -264,6 +292,11 @@ module.exports = Ferdium => {
     return base.substring(0, maxBaseLength) + ext;
   }
 
+  /**
+   * Sanitizes a base filename part (no extension).
+   * @param {string} baseName - The base name to sanitize.
+   * @returns {string} The sanitized base name.
+   */
   function sanitizeBasename(baseName) {
     if (typeof baseName !== 'string' || baseName.trim() === "") return "downloaded_document";
     let sanitized = baseName.trim()
@@ -278,6 +311,13 @@ module.exports = Ferdium => {
     return sanitized || "downloaded_document";
   }
 
+  /**
+   * Determines the filename for download based on the canvas title,
+   * prioritizing a `basename.ext` structure if found.
+   * @param {string} title - The original string (e.g., canvas title).
+   * @param {string} defaultExtension - The default extension if no structure is found.
+   * @returns {string} A processed filename.
+   */
   function determineFilename(title, defaultExtension = "txt") {
     const logPrefix = "Ferdium Gemini Recipe: determineFilename - ";
     if (!title || typeof title !== 'string' || title.trim() === "") {
@@ -323,6 +363,12 @@ module.exports = Ferdium => {
     }
   }
 
+  /**
+   * Creates and triggers a download for the given text content.
+   * @param {string} filename - The desired filename.
+   * @param {string} content - The text content to download.
+   * @param {string} contentType - The MIME type of the content.
+   */
   function triggerDownload(filename, content, contentType = 'text/plain;charset=utf-8') {
     try {
       const blob = new Blob([content], { type: contentType });
@@ -341,6 +387,11 @@ module.exports = Ferdium => {
     }
   }
 
+  /**
+   * Handles the click of the global canvas download button.
+   * Finds the active canvas title, then its toolbar and copy button,
+   * then reads from clipboard and initiates download.
+   */
   async function handleGlobalCanvasDownload() {
     const titleTextElement = document.querySelector(GEMINI_CANVAS_TITLE_TEXT_SELECTOR);
 
@@ -351,8 +402,7 @@ module.exports = Ferdium => {
     }
     console.log("Ferdium Gemini Recipe: Found canvas title element:", titleTextElement);
 
-    // Navigate up to the common toolbar ancestor. 
-    const toolbarElement = titleTextElement.closest('toolbar'); // Assumes <toolbar> is the tag name
+    const toolbarElement = titleTextElement.closest('toolbar'); 
 
     if (!toolbarElement) {
         console.warn("Ferdium Gemini Recipe: Could not find parent toolbar for the title element. Searched for 'toolbar' tag from title.");
@@ -405,6 +455,9 @@ module.exports = Ferdium => {
     }, 300); 
   }
 
+  /**
+   * Creates the snippet toolbar and adds it to the page.
+   */
   function createToolbar() {
     const toolbarId = 'gemini-snippet-toolbar-v0-1'; 
     if (document.getElementById(toolbarId)) {
@@ -477,15 +530,35 @@ module.exports = Ferdium => {
     }
   }
 
-  window.addEventListener('load', () => {
-    injectCustomCSS();
-    setTimeout(() => {
-        createToolbar();
-    }, 1000); 
+  // --- Initial Setup ---
+  // Redirect for Workspace users (if necessary) - Placed before module.exports logic
+  if (
+    location.hostname === 'workspace.google.com' &&
+    location.href.includes('products/gemini/')
+  ) {
+    location.href =
+      'https://accounts.google.com/AccountChooser?continue=https://gemini.google.com/u/0/';
+    // No return here, as the module export needs to happen for Ferdium.
+    // The page will redirect anyway.
+  }
+
+  // --- Ferdium Integration ---
+  Ferdium.handleDarkMode(isEnabled => { // This should be within the module.exports scope
+    localStorage.setItem('theme', isEnabled ? 'dark' : 'light');
   });
 
   Ferdium.displayErrorMessage = Ferdium.displayErrorMessage || function(message) {
     console.error("Ferdium Display Error:", message);
     alert(message); 
   };
-};
+  
+  // Initialize the main features after the window loads
+  window.addEventListener('load', () => {
+    injectCustomCSS();
+    // Increased delay slightly for potentially complex UI rendering
+    setTimeout(() => { 
+        createToolbar();
+    }, 1500); // Adjusted delay
+  });
+
+}; // End of module.exports
