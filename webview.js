@@ -1,6 +1,6 @@
 /**
  * Ferdium Recipe Webview Integration for Custom Google Gemini
- * Version: 0.0.22 (Synced CSS styles with userscript for centered toolbar)
+ * Version: 0.0.23 (Updated title selector to absolute path based on user JS path)
  * Author: Adromir (Original script by user, download feature added)
  */
 
@@ -233,7 +233,12 @@ module.exports = Ferdium => {
   
   // --- Canvas Download Feature ---
   const DEFAULT_DOWNLOAD_EXTENSION = "txt"; 
-  const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "immersive-panel.ng-tns-c1436378242-1.ng-trigger.ng-trigger-immersivePanelTransitions.ng-star-inserted code-immersive-panel > toolbar > div > div:nth-child(1) > h2.title-text.gds-title-s.ng-star-inserted"; 
+  
+  // Updated selector to directly target the title h2 element using the absolute path provided by the user.
+  // This is the primary way to detect an "active canvas".
+  const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "#app-root > main > side-navigation-v2 > bard-sidenav-container > bard-sidenav-content > div.content-wrapper > div > div.content-container > chat-window > immersive-panel > code-immersive-panel > toolbar > div > div.left-panel > h2.title-text.gds-title-s.ng-star-inserted";
+  
+  // This selector is relative to the toolbar element that will be found via the titleTextElement.
   const GEMINI_COPY_BUTTON_IN_TOOLBAR_SELECTOR = "div.action-buttons > copy-button.ng-star-inserted > button.copy-button";
     
   // eslint-disable-next-line no-control-regex
@@ -346,10 +351,11 @@ module.exports = Ferdium => {
     }
     console.log("Ferdium Gemini Recipe: Found canvas title element:", titleTextElement);
 
-    const toolbarElement = titleTextElement.closest('code-immersive-panel > toolbar'); 
+    // Navigate up to the common toolbar ancestor. 
+    const toolbarElement = titleTextElement.closest('toolbar'); // Assumes <toolbar> is the tag name
 
     if (!toolbarElement) {
-        console.warn("Ferdium Gemini Recipe: Could not find parent toolbar for the title element. Searched for 'code-immersive-panel > toolbar' from title.");
+        console.warn("Ferdium Gemini Recipe: Could not find parent toolbar for the title element. Searched for 'toolbar' tag from title.");
         Ferdium.displayErrorMessage("Could not locate the toolbar for the active canvas.");
         return;
     }
@@ -400,14 +406,14 @@ module.exports = Ferdium => {
   }
 
   function createToolbar() {
-    const toolbarId = 'gemini-snippet-toolbar-v0-1'; // This ID matches the CSS
+    const toolbarId = 'gemini-snippet-toolbar-v0-1'; 
     if (document.getElementById(toolbarId)) {
       console.log("Ferdium Gemini Recipe: Toolbar already exists.");
       return;
     }
     console.log("Ferdium Gemini Recipe: Initializing toolbar...");
     const toolbar = document.createElement('div');
-    toolbar.id = toolbarId; // Assign the ID for CSS styling
+    toolbar.id = toolbarId; 
     buttonSnippets.forEach(snippet => {
       const button = document.createElement('button');
       button.textContent = snippet.label;
@@ -444,7 +450,7 @@ module.exports = Ferdium => {
       }
     });
     const spacer = document.createElement('div');
-    spacer.className = 'toolbar-spacer'; // Class name for the spacer div
+    spacer.className = 'toolbar-spacer'; 
     toolbar.appendChild(spacer);
     const pasteButton = document.createElement('button');
     pasteButton.textContent = PASTE_BUTTON_LABEL;
