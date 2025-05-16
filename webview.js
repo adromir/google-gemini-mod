@@ -1,6 +1,6 @@
 /**
  * Ferdium Recipe Webview Integration for Custom Google Gemini
- * Version: 0.0.19 (Synced filename determination logic with userscript v0.0.4)
+ * Version: 0.0.20 (Simplified canvas detection logic, removed redundant selectors)
  * Author: Adromir (Original script by user, download feature added)
  */
 
@@ -117,28 +117,20 @@ module.exports = Ferdium => {
     },
   ];
 
-  /**
-   * Moves the cursor to the end of the provided element's content.
-   * @param {Element} element - The contenteditable element or paragraph within it.
-   */
   function moveCursorToEnd(element) {
     try {
       const range = document.createRange();
       const sel = window.getSelection();
       range.selectNodeContents(element);
-      range.collapse(false); // false collapses to the end
+      range.collapse(false); 
       sel.removeAllRanges();
       sel.addRange(range);
-      element.focus(); // Ensure focus after moving cursor
+      element.focus(); 
     } catch (e) {
       console.error("Ferdium Gemini Recipe: Error setting cursor position:", e);
     }
   }
 
-  /**
-   * Finds the target Gemini input element.
-   * @returns {Element | null} The found input element or null.
-   */
   function findTargetInputElement() {
     const selectorsToTry = [
       '.ql-editor p', 
@@ -146,84 +138,60 @@ module.exports = Ferdium => {
       'div[contenteditable="true"]' 
     ];
     let targetInputElement = null;
-
     for (const selector of selectorsToTry) {
       const element = document.querySelector(selector);
       if (element) {
         if (element.classList.contains('ql-editor')) {
           const pInEditor = element.querySelector('p');
-          if (pInEditor) {
-            targetInputElement = pInEditor;
-            break;
-          }
+          targetInputElement = pInEditor || element;
+        } else {
           targetInputElement = element;
-          break;
         }
-        targetInputElement = element;
         break;
       }
     }
     return targetInputElement;
   }
 
-
-  /**
-   * Inserts text into the Gemini input field, always appending.
-   * @param {string} textToInsert - The text snippet to insert.
-   */
   function insertSnippetText(textToInsert) {
     let targetInputElement = findTargetInputElement();
-    let actualInsertionPoint = targetInputElement;
-
-    if (targetInputElement) {
-        if (targetInputElement.classList.contains('ql-editor')) {
-            let p = targetInputElement.querySelector('p');
-            if (!p) {
-                p = document.createElement('p');
-                targetInputElement.appendChild(p);
-                console.log("Ferdium Gemini Recipe: Created new 'p' tag inside .ql-editor for insertion.");
-            }
-            actualInsertionPoint = p;
-        }
-        
-        actualInsertionPoint.focus();
-
-        setTimeout(() => {
-            moveCursorToEnd(actualInsertionPoint);
-
-            let insertedViaExec = false;
-            try {
-                insertedViaExec = document.execCommand('insertText', false, textToInsert);
-            } catch (e) {
-                console.warn("Ferdium Gemini Recipe: execCommand('insertText') threw an error:", e);
-                insertedViaExec = false;
-            }
-
-            if (!insertedViaExec) {
-                console.warn("Ferdium Gemini Recipe: execCommand('insertText') failed. Using fallback append.");
-                if (actualInsertionPoint.innerHTML === '<br>') {
-                    actualInsertionPoint.innerHTML = '';
-                }
-                actualInsertionPoint.textContent += textToInsert;
-                moveCursorToEnd(actualInsertionPoint);
-            }
-
-            const editorToDispatchOn = document.querySelector('.ql-editor') || targetInputElement;
-            if (editorToDispatchOn) {
-                editorToDispatchOn.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-                editorToDispatchOn.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
-            }
-            console.log("Ferdium Gemini Recipe: Snippet inserted.");
-        }, 50);
-
-    } else {
+    if (!targetInputElement) {
         console.error("Ferdium Gemini Recipe: Could not find the Gemini input field for snippet insertion.");
+        Ferdium.displayErrorMessage("Could not find Gemini input field.");
+        return;
     }
+    let actualInsertionPoint = targetInputElement;
+    if (targetInputElement.classList.contains('ql-editor')) {
+        let p = targetInputElement.querySelector('p');
+        if (!p) {
+            p = document.createElement('p');
+            targetInputElement.appendChild(p);
+        }
+        actualInsertionPoint = p;
+    }
+    actualInsertionPoint.focus();
+    setTimeout(() => {
+        moveCursorToEnd(actualInsertionPoint);
+        let insertedViaExec = false;
+        try {
+            insertedViaExec = document.execCommand('insertText', false, textToInsert);
+        } catch (e) {
+            console.warn("Ferdium Gemini Recipe: execCommand('insertText') threw an error:", e);
+        }
+        if (!insertedViaExec) {
+            if (actualInsertionPoint.innerHTML === '<br>') actualInsertionPoint.innerHTML = '';
+            actualInsertionPoint.textContent += textToInsert;
+            moveCursorToEnd(actualInsertionPoint);
+        }
+        const editorToDispatchOn = document.querySelector('.ql-editor') || targetInputElement;
+        if (editorToDispatchOn) {
+            editorToDispatchOn.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+            editorToDispatchOn.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+        }
+        console.log("Ferdium Gemini Recipe: Snippet inserted.");
+    }, 50);
   }
 
-  /**
-   * Handles the paste button click. Reads from clipboard and inserts text.
-   */
   async function handlePasteButtonClick() {
     try {
       if (!navigator.clipboard || !navigator.clipboard.readText) {
@@ -249,32 +217,25 @@ module.exports = Ferdium => {
   
   // --- Canvas Download Feature ---
   const DEFAULT_DOWNLOAD_EXTENSION = "txt"; 
-  const GEMINI_CANVAS_WRAPPER_SELECTOR = "immersive-panel.ng-tns-c1436378242-1.ng-trigger.ng-trigger-immersivePanelTransitions.ng-star-inserted"; 
-  const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "h2.title-text.gds-title-s"; 
-  const GEMINI_CANVAS_TITLE_BAR_SELECTOR = "div.toolbar.has-title"; 
-  const GEMINI_CANVAS_COPY_BUTTON_SELECTOR = "code-immersive-panel.ng-star-inserted copy-button.ng-star-inserted button.copy-button";
+  // This selector now directly targets the title h2 element within an active immersive panel.
+  // It's the primary way to detect an "active canvas".
+  const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "immersive-panel.ng-tns-c1436378242-1.ng-trigger.ng-trigger-immersivePanelTransitions.ng-star-inserted code-immersive-panel > toolbar > div > div:nth-child(1) > h2.title-text.gds-title-s.ng-star-inserted"; 
+  
+  // This selector is now relative to the toolbar element that will be found via the titleTextElement.
+  const GEMINI_COPY_BUTTON_IN_TOOLBAR_SELECTOR = "copy-button.ng-star-inserted button.copy-button.icon-button"; // More specific classes from user's CSS path
     
   // eslint-disable-next-line no-control-regex
   const INVALID_FILENAME_CHARS_REGEX = /[<>:"/\\|?*\x00-\x1F]/g;
   const RESERVED_WINDOWS_NAMES_REGEX = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
-  // General pattern for "basename.extension" where extension is 1-8 alphanumeric chars.
   const FILENAME_WITH_EXT_REGEX = /^(.+)\.([a-zA-Z0-9]{1,8})$/;
-  // For finding such a pattern as a substring (non-greedy base, ensuring it's followed by a word boundary or end of string)
   const SUBSTRING_FILENAME_REGEX = /([\w\s.,\-()[\\]{}'!~@#$%^&+=]+?\.([a-zA-Z0-9]{1,8}))(?=\s|$|[,.;:!?])/g;
 
-
-  /**
-   * Helper function to ensure filename length does not exceed a maximum.
-   * @param {string} filename - The filename to check.
-   * @param {number} maxLength - The maximum allowed length.
-   * @returns {string} The potentially truncated filename.
-   */
   function ensureLength(filename, maxLength = 255) {
     if (filename.length <= maxLength) {
         return filename;
     }
     const dotIndex = filename.lastIndexOf('.');
-    if (dotIndex === -1 || dotIndex < filename.length - 10 ) { // Arbitrary: if ext is likely > 8 chars or no dot
+    if (dotIndex === -1 || dotIndex < filename.length - 10 ) { 
         return filename.substring(0, maxLength);
     }
     const base = filename.substring(0, dotIndex);
@@ -286,47 +247,29 @@ module.exports = Ferdium => {
     return base.substring(0, maxBaseLength) + ext;
   }
 
-  /**
-   * Sanitizes a base filename part (no extension).
-   * @param {string} baseName - The base name to sanitize.
-   * @returns {string} The sanitized base name.
-   */
   function sanitizeBasename(baseName) {
     if (typeof baseName !== 'string' || baseName.trim() === "") return "downloaded_document";
-    
     let sanitized = baseName.trim()
         .replace(INVALID_FILENAME_CHARS_REGEX, '_')
         .replace(/\s+/g, '_')
         .replace(/__+/g, '_')
-        .replace(/^[_.-]+|[_.-]+$/g, ''); // Remove leading/trailing problematic chars
-
+        .replace(/^[_.-]+|[_.-]+$/g, '');
     if (!sanitized || RESERVED_WINDOWS_NAMES_REGEX.test(sanitized)) {
-        sanitized = `_${sanitized || "file"}_`; // Ensure it's not empty and not reserved
-        // Re-sanitize after modification
+        sanitized = `_${sanitized || "file"}_`;
         sanitized = sanitized.replace(INVALID_FILENAME_CHARS_REGEX, '_').replace(/\s+/g, '_').replace(/__+/g, '_').replace(/^[_.-]+|[_.-]+$/g, '');
     }
-    return sanitized || "downloaded_document"; // Final fallback if sanitization results in empty string
+    return sanitized || "downloaded_document";
   }
 
-  /**
-   * Determines the filename for download based on the canvas title,
-   * prioritizing a `basename.ext` structure if found.
-   * @param {string} title - The original string (e.g., canvas title).
-   * @param {string} defaultExtension - The default extension if no structure is found.
-   * @returns {string} A processed filename.
-   */
   function determineFilename(title, defaultExtension = "txt") {
-    const logPrefix = "Ferdium Gemini Recipe: determineFilename - "; // Changed prefix for Ferdium context
+    const logPrefix = "Ferdium Gemini Recipe: determineFilename - ";
     if (!title || typeof title !== 'string' || title.trim() === "") {
         console.log(`${logPrefix}Input title invalid or empty, defaulting to "downloaded_document.${defaultExtension}".`);
         return ensureLength(`downloaded_document.${defaultExtension}`);
     }
-
     let trimmedTitle = title.trim();
     let baseNamePart = "";
     let extensionPart = "";
-
-    // Attempt 1: Check if the entire trimmedTitle matches "basename.ext"
     const fullTitleMatch = trimmedTitle.match(FILENAME_WITH_EXT_REGEX);
     if (fullTitleMatch) {
         const potentialBase = fullTitleMatch[1];
@@ -337,8 +280,6 @@ module.exports = Ferdium => {
             console.log(`${logPrefix}Entire title "${trimmedTitle}" matches basename.ext. Base: "${baseNamePart}", Ext: "${extensionPart}"`);
         }
     }
-
-    // Attempt 2: If full title didn't match or base was invalid, find the last substring matching "basename.ext"
     if (!extensionPart) { 
         let lastMatch = null;
         let currentMatch;
@@ -346,7 +287,6 @@ module.exports = Ferdium => {
         while ((currentMatch = SUBSTRING_FILENAME_REGEX.exec(trimmedTitle)) !== null) {
             lastMatch = currentMatch;
         }
-
         if (lastMatch) {
             const substringExtMatch = lastMatch[1].match(FILENAME_WITH_EXT_REGEX);
             if (substringExtMatch) {
@@ -356,26 +296,16 @@ module.exports = Ferdium => {
             }
         }
     }
-
-    // Process based on what was found
     if (extensionPart) { 
         const sanitizedBase = sanitizeBasename(baseNamePart);
         return ensureLength(`${sanitizedBase}.${extensionPart}`);
     } else {
-        // Fallback: No "basename.ext" structure found. Sanitize the whole title and use default extension.
         console.log(`${logPrefix}No basename.ext pattern found. Sanitizing full title "${trimmedTitle}" with default extension "${defaultExtension}".`);
-        const sanitizedTitleBase = sanitizeBasename(trimmedTitle); // Sanitize the whole title as base
+        const sanitizedTitleBase = sanitizeBasename(trimmedTitle);
         return ensureLength(`${sanitizedTitleBase}.${defaultExtension}`);
     }
   }
 
-
-  /**
-   * Creates and triggers a download for the given text content.
-   * @param {string} filename - The desired filename.
-   * @param {string} content - The text content to download.
-   * @param {string} contentType - The MIME type of the content.
-   */
   function triggerDownload(filename, content, contentType = 'text/plain;charset=utf-8') {
     try {
       const blob = new Blob([content], { type: contentType });
@@ -394,26 +324,33 @@ module.exports = Ferdium => {
     }
   }
 
-  /**
-   * Handles the click of the global canvas download button.
-   * Finds the active canvas, triggers its "Copy to Clipboard" button,
-   * then reads from clipboard and initiates download.
-   */
   async function handleGlobalCanvasDownload() {
-    const canvasElement = document.querySelector(GEMINI_CANVAS_WRAPPER_SELECTOR);
+    // Attempt to find the title element directly. This is now the primary check for an active canvas.
+    const titleTextElement = document.querySelector(GEMINI_CANVAS_TITLE_TEXT_SELECTOR);
 
-    if (!canvasElement) {
-      console.warn("Ferdium Gemini Recipe: No open canvas found. Wrapper selector:", GEMINI_CANVAS_WRAPPER_SELECTOR);
+    if (!titleTextElement) {
+      console.warn("Ferdium Gemini Recipe: No active canvas title found. Selector:", GEMINI_CANVAS_TITLE_TEXT_SELECTOR);
       Ferdium.displayErrorMessage("No active canvas found to download.");
       return;
     }
-    console.log("Ferdium Gemini Recipe: Found canvas wrapper:", canvasElement);
+    console.log("Ferdium Gemini Recipe: Found canvas title element:", titleTextElement);
 
-    const copyButton = canvasElement.querySelector(GEMINI_CANVAS_COPY_BUTTON_SELECTOR);
+    // Try to find the toolbar element by navigating up from the title element
+    // Assumes structure: h2 -> div -> div -> toolbar -> code-immersive-panel
+    const toolbarElement = titleTextElement.closest('code-immersive-panel > toolbar'); 
+    // Alternative, more fragile: titleTextElement.parentElement.parentElement.parentElement;
 
+    if (!toolbarElement) {
+        console.warn("Ferdium Gemini Recipe: Could not find parent toolbar for the title element.");
+        Ferdium.displayErrorMessage("Could not locate the toolbar for the active canvas.");
+        return;
+    }
+    console.log("Ferdium Gemini Recipe: Found toolbar element relative to title:", toolbarElement);
+
+    const copyButton = toolbarElement.querySelector(GEMINI_COPY_BUTTON_IN_TOOLBAR_SELECTOR);
     if (!copyButton) {
-      console.warn("Ferdium Gemini Recipe: 'Copy to Clipboard' button not found in canvas. Please check GEMINI_CANVAS_COPY_BUTTON_SELECTOR. Selector used within wrapper:", GEMINI_CANVAS_COPY_BUTTON_SELECTOR);
-      Ferdium.displayErrorMessage("Could not find the 'Copy to Clipboard' button in the active canvas. Please verify its selector in the recipe.");
+      console.warn("Ferdium Gemini Recipe: 'Copy to Clipboard' button not found within the identified toolbar. Selector used:", GEMINI_COPY_BUTTON_IN_TOOLBAR_SELECTOR);
+      Ferdium.displayErrorMessage("Could not find the 'Copy to Clipboard' button in the active canvas's toolbar.");
       return;
     }
     console.log("Ferdium Gemini Recipe: Found 'Copy to Clipboard' button:", copyButton);
@@ -436,16 +373,8 @@ module.exports = Ferdium => {
           Ferdium.displayErrorMessage("Clipboard was empty after attempting to copy. Nothing to download.");
           return;
         }
-
-        let titleTextElement = canvasElement.querySelector(GEMINI_CANVAS_TITLE_TEXT_SELECTOR);
-        if (!titleTextElement) {
-            const titleBar = canvasElement.querySelector(GEMINI_CANVAS_TITLE_BAR_SELECTOR);
-            if (titleBar) {
-                titleTextElement = titleBar.querySelector(GEMINI_CANVAS_TITLE_TEXT_SELECTOR);
-            }
-        }
         
-        const canvasTitle = titleTextElement ? (titleTextElement.textContent || "Untitled Canvas").trim() : "Untitled Canvas";
+        const canvasTitle = (titleTextElement.textContent || "Untitled Canvas").trim();
         const filename = determineFilename(canvasTitle); 
         
         triggerDownload(filename, clipboardContent);
@@ -460,13 +389,8 @@ module.exports = Ferdium => {
         }
       }
     }, 300); 
-
   }
 
-
-  /**
-   * Creates the snippet toolbar and adds it to the page.
-   */
   function createToolbar() {
     const toolbarId = 'gemini-snippet-toolbar-v0-1';
     if (document.getElementById(toolbarId)) {
@@ -474,10 +398,8 @@ module.exports = Ferdium => {
       return;
     }
     console.log("Ferdium Gemini Recipe: Initializing toolbar...");
-
     const toolbar = document.createElement('div');
     toolbar.id = toolbarId;
-
     buttonSnippets.forEach(snippet => {
       const button = document.createElement('button');
       button.textContent = snippet.label;
@@ -487,26 +409,22 @@ module.exports = Ferdium => {
       });
       toolbar.appendChild(button);
     });
-
     dropdownConfigurations.forEach(config => {
       if (config.options && config.options.length > 0) {
         const select = document.createElement('select');
         select.title = config.placeholder || "Select snippet";
-
         const defaultOption = document.createElement('option');
         defaultOption.textContent = config.placeholder || "Select...";
         defaultOption.value = "";
         defaultOption.disabled = true;
         defaultOption.selected = true;
         select.appendChild(defaultOption);
-
         config.options.forEach(snippet => {
           const option = document.createElement('option');
           option.textContent = snippet.label;
           option.value = snippet.text;
           select.appendChild(option);
         });
-
         select.addEventListener('change', (event) => {
           const selectedText = event.target.value;
           if (selectedText) {
@@ -517,23 +435,19 @@ module.exports = Ferdium => {
         toolbar.appendChild(select);
       }
     });
-    
     const spacer = document.createElement('div');
     spacer.className = 'toolbar-spacer';
     toolbar.appendChild(spacer);
-
     const pasteButton = document.createElement('button');
     pasteButton.textContent = PASTE_BUTTON_LABEL;
     pasteButton.title = "Paste from Clipboard";
     pasteButton.addEventListener('click', handlePasteButtonClick);
     toolbar.appendChild(pasteButton);
-
     const globalDownloadButton = document.createElement('button');
     globalDownloadButton.textContent = DOWNLOAD_BUTTON_LABEL;
     globalDownloadButton.title = "Download active canvas content (uses canvas's copy button)";
     globalDownloadButton.addEventListener('click', handleGlobalCanvasDownload); 
     toolbar.appendChild(globalDownloadButton);
-
     if (document.body) {
       document.body.insertBefore(toolbar, document.body.firstChild);
       console.log("Ferdium Gemini Recipe: Toolbar inserted.");
@@ -549,7 +463,6 @@ module.exports = Ferdium => {
     }
   }
 
-  // --- Initialization Logic ---
   window.addEventListener('load', () => {
     injectCustomCSS();
     setTimeout(() => {
@@ -561,5 +474,4 @@ module.exports = Ferdium => {
     console.error("Ferdium Display Error:", message);
     alert(message); 
   };
-
-}; // End of module.exports
+};
