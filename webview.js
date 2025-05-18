@@ -1,6 +1,6 @@
 /**
  * Ferdium Recipe Webview Integration for Custom Google Gemini
- * Version: 0.0.27 (Reorganized code structure for better readability)
+ * Version: 0.0.28 (Improved filename generation to handle path components in title)
  * Author: Adromir (Original script by user, download feature added)
  */
 
@@ -15,17 +15,8 @@ module.exports = Ferdium => {
   const DOWNLOAD_BUTTON_LABEL = "💾 Download Canvas as File";
 
   // --- CSS Selectors for DOM Elements ---
-  //    (Used by the global download button and snippet insertion)
-
-  // Selector to find the h2 title element of an active canvas.
-  // This is the primary way to detect an "active canvas".
-  const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "#app-root > main > side-navigation-v2 > bard-sidenav-container > bard-sidenav-content > div.content-wrapper > div > div.content-container > chat-window > immersive-panel > code-immersive-panel > toolbar > div > div.left-panel > h2.title-text.gds-title-s.ng-star-inserted";
-  
-  // Selector for the "Copy to Clipboard" button, relative to the toolbar element.
-  // The toolbar element is found by navigating up from the titleTextElement.
+  const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "#app-root > main > side-navigation-v2 > bard-sidenav-container > bard-sidenav-content > div.content-wrapper > div > div.content-container > chat-window > immersive-panel > code-immersive-panel > toolbar > div > div.left-panel > h2.title-text.gds-title-s.ng-star-inserted"; 
   const GEMINI_COPY_BUTTON_IN_TOOLBAR_SELECTOR = "div.action-buttons > copy-button.ng-star-inserted > button.copy-button";
-
-  // Selectors for the Gemini input field (for snippet insertion)
   const GEMINI_INPUT_FIELD_SELECTORS = [
       '.ql-editor p', 
       '.ql-editor',   
@@ -39,9 +30,7 @@ module.exports = Ferdium => {
   // eslint-disable-next-line no-control-regex
   const INVALID_FILENAME_CHARS_REGEX = /[<>:"/\\|?*\x00-\x1F]/g;
   const RESERVED_WINDOWS_NAMES_REGEX = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
-  // General pattern for "basename.extension" where extension is 1-8 alphanumeric chars.
   const FILENAME_WITH_EXT_REGEX = /^(.+)\.([a-zA-Z0-9]{1,8})$/; 
-  // For finding such a pattern as a substring (non-greedy base, ensuring it's followed by a word boundary or end of string)
   const SUBSTRING_FILENAME_REGEX = /([\w\s.,\-()[\\]{}'!~@#$%^&+=]+?\.([a-zA-Z0-9]{1,8}))(?=\s|$|[,.;:!?])/g;
 
 
@@ -49,13 +38,11 @@ module.exports = Ferdium => {
   // II. TOOLBAR ELEMENT DEFINITIONS
   // ===================================================================================
 
-  // --- Snippet Buttons Configuration ---
   const buttonSnippets = [
     { label: "Greeting", text: "Hello Gemini!" },
     { label: "Explain", text: "Could you please explain ... in more detail?" },
   ];
 
-  // --- Dropdown Menus Configuration ---
   const dropdownConfigurations = [
     {
       placeholder: "Actions...",
@@ -79,7 +66,6 @@ module.exports = Ferdium => {
   // III. SCRIPT LOGIC
   // ===================================================================================
 
-  // --- Embedded CSS for the Toolbar ---
   const embeddedCSS = `
     #gemini-snippet-toolbar-v0-1 { 
       position: fixed !important; 
@@ -144,9 +130,6 @@ module.exports = Ferdium => {
     }
   `;
 
-  /**
-   * Injects the embedded CSS safely into the document head.
-   */
   function injectCustomCSS() {
     const styleId = 'ferdium-gemini-custom-styles';
     if (document.getElementById(styleId)) return;
@@ -161,10 +144,6 @@ module.exports = Ferdium => {
     }
   }
 
-  /**
-   * Moves the cursor to the end of the provided element's content.
-   * @param {Element} element - The contenteditable element or paragraph within it.
-   */
   function moveCursorToEnd(element) {
     try {
       const range = document.createRange();
@@ -179,10 +158,6 @@ module.exports = Ferdium => {
     }
   }
 
-  /**
-   * Finds the target Gemini input element.
-   * @returns {Element | null} The found input element or null.
-   */
   function findTargetInputElement() {
     let targetInputElement = null;
     for (const selector of GEMINI_INPUT_FIELD_SELECTORS) {
@@ -200,10 +175,6 @@ module.exports = Ferdium => {
     return targetInputElement;
   }
 
-  /**
-   * Inserts text into the Gemini input field, always appending.
-   * @param {string} textToInsert - The text snippet to insert.
-   */
   function insertSnippetText(textToInsert) {
     let targetInputElement = findTargetInputElement();
     if (!targetInputElement) {
@@ -243,9 +214,6 @@ module.exports = Ferdium => {
     }, 50);
   }
 
-  /**
-   * Handles the paste button click. Reads from clipboard and inserts text.
-   */
   async function handlePasteButtonClick() {
     try {
       if (!navigator.clipboard || !navigator.clipboard.readText) {
@@ -269,12 +237,6 @@ module.exports = Ferdium => {
     }
   }
   
-  /**
-   * Helper function to ensure filename length does not exceed a maximum.
-   * @param {string} filename - The filename to check.
-   * @param {number} maxLength - The maximum allowed length.
-   * @returns {string} The potentially truncated filename.
-   */
   function ensureLength(filename, maxLength = 255) {
     if (filename.length <= maxLength) {
         return filename;
@@ -292,11 +254,6 @@ module.exports = Ferdium => {
     return base.substring(0, maxBaseLength) + ext;
   }
 
-  /**
-   * Sanitizes a base filename part (no extension).
-   * @param {string} baseName - The base name to sanitize.
-   * @returns {string} The sanitized base name.
-   */
   function sanitizeBasename(baseName) {
     if (typeof baseName !== 'string' || baseName.trim() === "") return "downloaded_document";
     let sanitized = baseName.trim()
@@ -311,32 +268,36 @@ module.exports = Ferdium => {
     return sanitized || "downloaded_document";
   }
 
-  /**
-   * Determines the filename for download based on the canvas title,
-   * prioritizing a `basename.ext` structure if found.
-   * @param {string} title - The original string (e.g., canvas title).
-   * @param {string} defaultExtension - The default extension if no structure is found.
-   * @returns {string} A processed filename.
-   */
   function determineFilename(title, defaultExtension = "txt") {
     const logPrefix = "Ferdium Gemini Recipe: determineFilename - ";
     if (!title || typeof title !== 'string' || title.trim() === "") {
         console.log(`${logPrefix}Input title invalid or empty, defaulting to "downloaded_document.${defaultExtension}".`);
         return ensureLength(`downloaded_document.${defaultExtension}`);
     }
+
     let trimmedTitle = title.trim();
     let baseNamePart = "";
     let extensionPart = "";
+
+    function stripPath(base) {
+        if (typeof base !== 'string') return base;
+        const lastSlash = Math.max(base.lastIndexOf('/'), base.lastIndexOf('\\'));
+        return lastSlash !== -1 ? base.substring(lastSlash + 1) : base;
+    }
+
     const fullTitleMatch = trimmedTitle.match(FILENAME_WITH_EXT_REGEX);
     if (fullTitleMatch) {
-        const potentialBase = fullTitleMatch[1];
+        let potentialBase = fullTitleMatch[1];
         const potentialExt = fullTitleMatch[2].toLowerCase();
-        if (!INVALID_FILENAME_CHARS_REGEX.test(potentialBase.replace(/\s/g, '_'))) {
+        potentialBase = stripPath(potentialBase); 
+
+        if (!INVALID_FILENAME_CHARS_REGEX.test(potentialBase.replace(/\s/g, '_')) && potentialBase.trim() !== "") {
             baseNamePart = potentialBase;
             extensionPart = potentialExt;
-            console.log(`${logPrefix}Entire title "${trimmedTitle}" matches basename.ext. Base: "${baseNamePart}", Ext: "${extensionPart}"`);
+            console.log(`${logPrefix}Entire title "${trimmedTitle}" (path stripped) matches basename.ext. Base: "${baseNamePart}", Ext: "${extensionPart}"`);
         }
     }
+
     if (!extensionPart) { 
         let lastMatch = null;
         let currentMatch;
@@ -345,30 +306,32 @@ module.exports = Ferdium => {
             lastMatch = currentMatch;
         }
         if (lastMatch) {
-            const substringExtMatch = lastMatch[1].match(FILENAME_WITH_EXT_REGEX);
+            const substringCandidate = lastMatch[1]; 
+            const substringExtMatch = substringCandidate.match(FILENAME_WITH_EXT_REGEX);
             if (substringExtMatch) {
-                baseNamePart = substringExtMatch[1];
-                extensionPart = substringExtMatch[2].toLowerCase();
-                console.log(`${logPrefix}Found substring "${lastMatch[1]}" matching basename.ext. Base: "${baseNamePart}", Ext: "${extensionPart}"`);
+                let potentialBaseFromSub = substringExtMatch[1];
+                const potentialExtFromSub = substringExtMatch[2].toLowerCase();
+                potentialBaseFromSub = stripPath(potentialBaseFromSub);
+                if (potentialBaseFromSub.trim() !== "") {
+                     baseNamePart = potentialBaseFromSub;
+                     extensionPart = potentialExtFromSub;
+                     console.log(`${logPrefix}Found substring "${substringCandidate}" (path stripped) matching basename.ext. Base: "${baseNamePart}", Ext: "${extensionPart}"`);
+                }
             }
         }
     }
+
     if (extensionPart) { 
         const sanitizedBase = sanitizeBasename(baseNamePart);
         return ensureLength(`${sanitizedBase}.${extensionPart}`);
     } else {
-        console.log(`${logPrefix}No basename.ext pattern found. Sanitizing full title "${trimmedTitle}" with default extension "${defaultExtension}".`);
-        const sanitizedTitleBase = sanitizeBasename(trimmedTitle);
+        console.log(`${logPrefix}No basename.ext pattern found. Sanitizing full title (path stripped) "${trimmedTitle}" with default extension "${defaultExtension}".`);
+        const baseForDefault = stripPath(trimmedTitle); 
+        const sanitizedTitleBase = sanitizeBasename(baseForDefault);
         return ensureLength(`${sanitizedTitleBase}.${defaultExtension}`);
     }
   }
 
-  /**
-   * Creates and triggers a download for the given text content.
-   * @param {string} filename - The desired filename.
-   * @param {string} content - The text content to download.
-   * @param {string} contentType - The MIME type of the content.
-   */
   function triggerDownload(filename, content, contentType = 'text/plain;charset=utf-8') {
     try {
       const blob = new Blob([content], { type: contentType });
@@ -387,11 +350,6 @@ module.exports = Ferdium => {
     }
   }
 
-  /**
-   * Handles the click of the global canvas download button.
-   * Finds the active canvas title, then its toolbar and copy button,
-   * then reads from clipboard and initiates download.
-   */
   async function handleGlobalCanvasDownload() {
     const titleTextElement = document.querySelector(GEMINI_CANVAS_TITLE_TEXT_SELECTOR);
 
@@ -455,9 +413,6 @@ module.exports = Ferdium => {
     }, 300); 
   }
 
-  /**
-   * Creates the snippet toolbar and adds it to the page.
-   */
   function createToolbar() {
     const toolbarId = 'gemini-snippet-toolbar-v0-1'; 
     if (document.getElementById(toolbarId)) {
@@ -531,19 +486,15 @@ module.exports = Ferdium => {
   }
 
   // --- Initial Setup ---
-  // Redirect for Workspace users (if necessary) - Placed before module.exports logic
   if (
     location.hostname === 'workspace.google.com' &&
     location.href.includes('products/gemini/')
   ) {
     location.href =
       'https://accounts.google.com/AccountChooser?continue=https://gemini.google.com/u/0/';
-    // No return here, as the module export needs to happen for Ferdium.
-    // The page will redirect anyway.
   }
 
-  // --- Ferdium Integration ---
-  Ferdium.handleDarkMode(isEnabled => { // This should be within the module.exports scope
+  Ferdium.handleDarkMode(isEnabled => { 
     localStorage.setItem('theme', isEnabled ? 'dark' : 'light');
   });
 
@@ -552,13 +503,11 @@ module.exports = Ferdium => {
     alert(message); 
   };
   
-  // Initialize the main features after the window loads
   window.addEventListener('load', () => {
     injectCustomCSS();
-    // Increased delay slightly for potentially complex UI rendering
     setTimeout(() => { 
         createToolbar();
-    }, 1500); // Adjusted delay
+    }, 1500); 
   });
 
-}; // End of module.exports
+};
