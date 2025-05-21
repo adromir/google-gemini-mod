@@ -1,6 +1,6 @@
 /**
  * Ferdium Recipe Webview Integration for Custom Google Gemini
- * Version: 0.0.28 (Improved filename generation to handle path components in title)
+ * Version: 0.0.31 (Revised copy button search to be global, based on new XPATH)
  * Author: Adromir (Original script by user, download feature added)
  */
 
@@ -15,8 +15,21 @@ module.exports = Ferdium => {
   const DOWNLOAD_BUTTON_LABEL = "💾 Download Canvas as File";
 
   // --- CSS Selectors for DOM Elements ---
-  const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "#app-root > main > side-navigation-v2 > bard-sidenav-container > bard-sidenav-content > div.content-wrapper > div > div.content-container > chat-window > immersive-panel > code-immersive-panel > toolbar > div > div.left-panel > h2.title-text.gds-title-s.ng-star-inserted"; 
-  const GEMINI_COPY_BUTTON_IN_TOOLBAR_SELECTOR = "div.action-buttons > copy-button.ng-star-inserted > button.copy-button";
+  // Selector to find the h2 title element of an active canvas.
+  // This is the primary way to detect if a relevant canvas context is active.
+  const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "code-immersive-panel > toolbar > div > div.left-panel > h2.title-text.gds-title-s.ng-star-inserted"; 
+  
+  // Selector for the "Share" button within the canvas's toolbar area.
+  // Based on user JS Path: #app-root > ... > code-immersive-panel > toolbar > div > div.action-buttons > div > share-button > button
+  const GEMINI_CANVAS_SHARE_BUTTON_SELECTOR = "toolbar div.action-buttons share-button > button";
+
+  // Selector for the "Copy to Clipboard" button, likely in a modal/overlay after share is clicked.
+  // Based on user XPATH /html/body/div[7]/div[2]/div/div/div/copy-button and previous HTML structure.
+  const GEMINI_CANVAS_COPY_BUTTON_SELECTOR = "body > div:nth-child(n) > div:nth-child(n) > div > div > div > copy-button[data-test-id='copy-button'] > button.copy-button";
+  // Alternative, more robust if data-test-id is unique enough and div structure varies:
+  // const GEMINI_CANVAS_COPY_BUTTON_SELECTOR = "copy-button[data-test-id='copy-button'] > button.copy-button";
+
+
   const GEMINI_INPUT_FIELD_SELECTORS = [
       '.ql-editor p', 
       '.ql-editor',   
@@ -360,57 +373,70 @@ module.exports = Ferdium => {
     }
     console.log("Ferdium Gemini Recipe: Found canvas title element:", titleTextElement);
 
-    const toolbarElement = titleTextElement.closest('toolbar'); 
-
-    if (!toolbarElement) {
-        console.warn("Ferdium Gemini Recipe: Could not find parent toolbar for the title element. Searched for 'toolbar' tag from title.");
-        Ferdium.displayErrorMessage("Could not locate the toolbar for the active canvas.");
+    const codeImmersivePanelElement = titleTextElement.closest('code-immersive-panel');
+    if (!codeImmersivePanelElement) {
+        console.warn("Ferdium Gemini Recipe: Could not find parent 'code-immersive-panel' for the title element.");
+        Ferdium.displayErrorMessage("Could not locate the main canvas panel for the active canvas.");
         return;
     }
-    console.log("Ferdium Gemini Recipe: Found toolbar element relative to title:", toolbarElement);
-
-    const copyButton = toolbarElement.querySelector(GEMINI_COPY_BUTTON_IN_TOOLBAR_SELECTOR);
-    if (!copyButton) {
-      console.warn("Ferdium Gemini Recipe: 'Copy to Clipboard' button not found within the identified toolbar. Selector used on toolbar:", GEMINI_COPY_BUTTON_IN_TOOLBAR_SELECTOR);
-      Ferdium.displayErrorMessage("Could not find the 'Copy to Clipboard' button in the active canvas's toolbar.");
+    console.log("Ferdium Gemini Recipe: Found 'code-immersive-panel' element:", codeImmersivePanelElement);
+    
+    const shareButton = codeImmersivePanelElement.querySelector(GEMINI_CANVAS_SHARE_BUTTON_SELECTOR);
+    if (!shareButton) {
+      console.warn("Ferdium Gemini Recipe: 'Share' button not found within 'code-immersive-panel'. Selector used:", GEMINI_CANVAS_SHARE_BUTTON_SELECTOR);
+      Ferdium.displayErrorMessage("Could not find the 'Share' button in the active canvas's panel.");
       return;
     }
-    console.log("Ferdium Gemini Recipe: Found 'Copy to Clipboard' button:", copyButton);
+    console.log("Ferdium Gemini Recipe: Found 'Share' button:", shareButton);
+    shareButton.click();
+    console.log("Ferdium Gemini Recipe: Programmatically clicked the 'Share' button.");
 
-    copyButton.click();
-    console.log("Ferdium Gemini Recipe: Programmatically clicked the 'Copy to Clipboard' button.");
-
-    setTimeout(async () => {
-      try {
-        if (!navigator.clipboard || !navigator.clipboard.readText) {
-          console.warn("Ferdium Gemini Recipe: Clipboard API not available or readText not supported for download.");
-          Ferdium.displayErrorMessage("Clipboard access is not available. Cannot retrieve content for download.");
+    // Wait for the copy button (potentially in a modal/overlay) to appear
+    setTimeout(() => {
+        const copyButton = document.querySelector(GEMINI_CANVAS_COPY_BUTTON_SELECTOR);
+        if (!copyButton) {
+          console.warn("Ferdium Gemini Recipe: 'Copy to Clipboard' button not found globally after clicking share. Selector used:", GEMINI_CANVAS_COPY_BUTTON_SELECTOR);
+          Ferdium.displayErrorMessage("Could not find the 'Copy to Clipboard' button after clicking share.");
           return;
         }
-        const clipboardContent = await navigator.clipboard.readText();
-        console.log("Ferdium Gemini Recipe: Successfully read from clipboard.");
+        console.log("Ferdium Gemini Recipe: Found 'Copy to Clipboard' button globally:", copyButton);
 
-        if (!clipboardContent || clipboardContent.trim() === "") {
-          console.warn("Ferdium Gemini Recipe: Clipboard is empty after copy operation.");
-          Ferdium.displayErrorMessage("Clipboard was empty after attempting to copy. Nothing to download.");
-          return;
-        }
-        
-        const canvasTitle = (titleTextElement.textContent || "Untitled Canvas").trim();
-        const filename = determineFilename(canvasTitle); 
-        
-        triggerDownload(filename, clipboardContent);
-        console.log("Ferdium Gemini Recipe: Global download initiated for canvas title:", canvasTitle, "using clipboard content. Filename:", filename);
+        copyButton.click();
+        console.log("Ferdium Gemini Recipe: Programmatically clicked the 'Copy to Clipboard' button.");
 
-      } catch (err) {
-        console.error('Ferdium Gemini Recipe: Failed to read from clipboard after copy:', err);
-        if (err.name === 'NotAllowedError') {
-          Ferdium.displayErrorMessage('Permission to read clipboard was denied. Please allow clipboard access.');
-        } else {
-          Ferdium.displayErrorMessage('Failed to read from clipboard. See console for details.');
-        }
-      }
-    }, 300); 
+        // Wait a moment for the clipboard operation to complete
+        setTimeout(async () => {
+          try {
+            if (!navigator.clipboard || !navigator.clipboard.readText) {
+              console.warn("Ferdium Gemini Recipe: Clipboard API not available or readText not supported for download.");
+              Ferdium.displayErrorMessage("Clipboard access is not available. Cannot retrieve content for download.");
+              return;
+            }
+            const clipboardContent = await navigator.clipboard.readText();
+            console.log("Ferdium Gemini Recipe: Successfully read from clipboard.");
+
+            if (!clipboardContent || clipboardContent.trim() === "") {
+              console.warn("Ferdium Gemini Recipe: Clipboard is empty after copy operation.");
+              Ferdium.displayErrorMessage("Clipboard was empty after attempting to copy. Nothing to download.");
+              return;
+            }
+            
+            const canvasTitle = (titleTextElement.textContent || "Untitled Canvas").trim();
+            const filename = determineFilename(canvasTitle); 
+            
+            triggerDownload(filename, clipboardContent);
+            console.log("Ferdium Gemini Recipe: Global download initiated for canvas title:", canvasTitle, "using clipboard content. Filename:", filename);
+
+          } catch (err) {
+            console.error('Ferdium Gemini Recipe: Failed to read from clipboard after copy:', err);
+            if (err.name === 'NotAllowedError') {
+              Ferdium.displayErrorMessage('Permission to read clipboard was denied. Please allow clipboard access.');
+            } else {
+              Ferdium.displayErrorMessage('Failed to read from clipboard. See console for details.');
+            }
+          }
+        }, 300); // Delay for clipboard write
+    }, 500); // Delay for share menu to open and copy button to appear
   }
 
   function createToolbar() {
