@@ -1,1 +1,38 @@
-<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M16 8.016A8.522 8.522 0 008.016 16h-.032A8.521 8.521 0 000 8.016v-.032A8.521 8.521 0 007.984 0h.032A8.522 8.522 0 0016 7.984v.032z" fill="url(#prefix__paint0_radial_980_20147)"/><defs><radialGradient id="prefix__paint0_radial_980_20147" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(16.1326 5.4553 -43.70045 129.2322 1.588 6.503)"><stop offset=".067" stop-color="#9168C0"/><stop offset=".343" stop-color="#5684D1"/><stop offset=".672" stop-color="#1BA1E3"/></radialGradient></defs></svg>
+<svg width="200" height="200" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+	<defs>
+		<!-- Die Maske, die das Pluszeichen definiert -->
+		<mask id="plus-mask">
+			<!-- Der weiße Bereich der Maske lässt die darunter liegenden Formen sichtbar -->
+			<rect width="100" height="100" fill="white"/>
+			<!-- Das schwarze Pluszeichen wird aus den Formen ausgeschnitten (jetzt kleiner) -->
+			<path d="M45,35 L55,35 L55,45 L65,45 L65,55 L55,55 L55,65 L45,65 L45,55 L35,55 L35,45 L45,45 Z" fill="black"/>
+		</mask>
+
+		<!-- Farbverläufe -->
+		<linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+			<stop offset="0%" style="stop-color:#0052D4;"/>
+			<stop offset="100%" style="stop-color:#6FB1FC;"/>
+		</linearGradient>
+		<linearGradient id="yellowGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+			<stop offset="0%" style="stop-color:#FDC830;"/>
+			<stop offset="100%" style="stop-color:#F37335;"/>
+		</linearGradient>
+		<linearGradient id="redGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+			<stop offset="0%" style="stop-color:#f12711;"/>
+			<stop offset="100%" style="stop-color:#f5af19;"/>
+		</linearGradient>
+		<linearGradient id="greenGradient" x1="100%" y1="100%" x2="0%" y2="0%">
+			<stop offset="0%" style="stop-color:#009245;"/>
+			<stop offset="100%" style="stop-color:#8DC63F;"/>
+		</linearGradient>
+	</defs>
+
+	<!-- Eine Gruppe für die korrekten Sternformen, auf die die Maske angewendet wird -->
+	<g mask="url(#plus-mask)">
+		<!-- Die vier Pfade, die die korrekte Sternform bilden -->
+		<path d="M 50 0 C 50 25, 25 50, 0 50 L 45 50 L 45 45 L 50 45 L 50 0 Z" fill="url(#blueGradient)"/>
+		<path d="M 50 0 C 50 25, 75 50, 100 50 L 55 50 L 55 45 L 50 45 L 50 0 Z" fill="url(#yellowGradient)"/>
+		<path d="M 100 50 C 75 50, 50 75, 50 100 L 50 55 L 55 55 L 55 50 L 100 50 Z" fill="url(#redGradient)"/>
+		<path d="M 0 50 C 25 50, 50 75, 50 100 L 50 55 L 45 55 L 45 50 L 0 50 Z" fill="url(#greenGradient)"/>
+	</g>
+</svg>
