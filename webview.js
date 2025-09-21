@@ -1,15 +1,15 @@
 /**
  * Ferdium Recipe Webview Integration for Custom Google Gemini
- * Version: 0.0.7
+ * Version: 0.0.4
  * Author: Adromir
  * Changelog:
- * - Fixed settings panel layout issues:
+ * - Added sort functionality: Users can now reorder buttons and dropdowns
+ *   in the settings panel using up/down arrow buttons.
+ * - Updated remove button logic to refresh sort button states correctly.
  * - Aligned dropdown placeholder input and remove button side-by-side.
  * - Added spacing between save and cancel buttons.
  * - Fixed crash on initialization by rewriting settings panel creation
  * to be compliant with TrustedHTML Content Security Policy.
- * - Replaced all instances of innerHTML = '' with a CSP-compliant
- * node removal loop to prevent TrustedHTML violations when clearing content.
  */
 
 module.exports = Ferdium => {
@@ -132,10 +132,11 @@ module.exports = Ferdium => {
         #gemini-mod-settings-panel textarea { min-height: 80px; resize: vertical; }
         #gemini-mod-settings-panel .item-group {
             border: 1px solid #444; border-radius: 8px; padding: 15px; margin-bottom: 10px;
-            display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: center;
+            display: grid; grid-template-columns: auto 1fr 1fr auto; gap: 10px; align-items: center;
         }
-         #gemini-mod-settings-panel .dropdown-item-group {
+        #gemini-mod-settings-panel .dropdown-item-group {
             border: 1px solid #444; border-radius: 8px; padding: 15px; margin-bottom: 10px;
+            position: relative;
         }
         #gemini-mod-settings-panel .dropdown-options-container { margin-left: 20px; margin-top: 10px; }
         #gemini-mod-settings-panel .option-item { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: center; margin-bottom: 5px; }
@@ -153,6 +154,9 @@ module.exports = Ferdium => {
             justify-content: flex-end;
             gap: 8px;
         }
+        #gemini-mod-settings-panel .sort-controls { display: flex; flex-direction: column; gap: 4px; }
+        #gemini-mod-settings-panel .sort-btn { padding: 2px 6px !important; height: auto !important; line-height: 1; }
+        #gemini-mod-settings-panel .sort-btn:disabled { background-color: #202122 !important; color: #5f6368 !important; cursor: not-allowed; }
     `;
 
     // --- Core Functions ---
@@ -224,14 +228,14 @@ module.exports = Ferdium => {
         if (!settingsPanel) return;
 
         const newButtons = [];
-        settingsPanel.querySelectorAll('#settings-buttons .item-group').forEach(group => {
+        settingsPanel.querySelectorAll('#buttons-container > .item-group').forEach(group => {
             const label = group.querySelector('.label-input').value.trim();
             const text = group.querySelector('.text-input').value;
             if (label) newButtons.push({ label, text });
         });
 
         const newDropdowns = [];
-        settingsPanel.querySelectorAll('#settings-dropdowns .dropdown-item-group').forEach(group => {
+        settingsPanel.querySelectorAll('#dropdowns-container > .dropdown-item-group').forEach(group => {
             const placeholder = group.querySelector('.placeholder-input').value.trim();
             const options = [];
             group.querySelectorAll('.option-item').forEach(opt => {
@@ -256,7 +260,7 @@ module.exports = Ferdium => {
             console.error("Ferdium Gemini Recipe: Error saving settings:", e);
         }
     }
-    
+
     /**
      * Safely removes all child nodes from a given DOM element.
      * @param {HTMLElement} element The element to clear.
@@ -342,6 +346,17 @@ module.exports = Ferdium => {
 
     // --- Settings Panel UI ---
 
+    function updateSortButtonsState(container) {
+        if (!container) return;
+        const items = Array.from(container.children);
+        items.forEach((item, i) => {
+            const upBtn = item.querySelector('.sort-btn-up');
+            const downBtn = item.querySelector('.sort-btn-down');
+            if (upBtn) upBtn.disabled = (i === 0);
+            if (downBtn) downBtn.disabled = (i === items.length - 1);
+        });
+    }
+
     function createSettingsPanel() {
         if (document.getElementById('gemini-mod-settings-panel')) return;
 
@@ -402,25 +417,61 @@ module.exports = Ferdium => {
         // Event Listeners
         saveBtn.addEventListener('click', saveConfiguration);
         cancelBtn.addEventListener('click', () => toggleSettingsPanel(false));
-        addButtonBtn.addEventListener('click', () => addButtonToPanel());
-        addDropdownBtn.addEventListener('click', () => addDropdownToPanel());
+        addButtonBtn.addEventListener('click', () => {
+            const container = document.getElementById('buttons-container');
+            addButtonToPanel(undefined, container);
+            updateSortButtonsState(container);
+        });
+        addDropdownBtn.addEventListener('click', () => {
+            const container = document.getElementById('dropdowns-container');
+            addDropdownToPanel(undefined, container);
+            updateSortButtonsState(container);
+        });
     }
 
     function populateSettingsPanel() {
         const buttonsContainer = document.getElementById('buttons-container');
         const dropdownsContainer = document.getElementById('dropdowns-container');
-        
+
         clearElement(buttonsContainer);
         clearElement(dropdownsContainer);
 
-        currentButtonSnippets.forEach(btn => addButtonToPanel(btn));
-        currentDropdownConfigurations.forEach(dd => addDropdownToPanel(dd));
+        currentButtonSnippets.forEach(btn => addButtonToPanel(btn, buttonsContainer));
+        updateSortButtonsState(buttonsContainer);
+
+        currentDropdownConfigurations.forEach(dd => addDropdownToPanel(dd, dropdownsContainer));
+        updateSortButtonsState(dropdownsContainer);
     }
 
-    function addButtonToPanel(button = { label: '', text: '' }) {
-        const container = document.getElementById('buttons-container');
+    function addButtonToPanel(button = { label: '', text: '' }, container) {
+        if (!container) container = document.getElementById('buttons-container');
         const group = document.createElement('div');
         group.className = 'item-group';
+
+        // Sort Controls
+        const sortControls = document.createElement('div');
+        sortControls.className = 'sort-controls';
+        const upBtn = document.createElement('button');
+        upBtn.textContent = '▲';
+        upBtn.className = 'sort-btn sort-btn-up';
+        upBtn.addEventListener('click', () => {
+            if (group.previousElementSibling) {
+                group.parentNode.insertBefore(group, group.previousElementSibling);
+                updateSortButtonsState(container);
+            }
+        });
+        const downBtn = document.createElement('button');
+        downBtn.textContent = '▼';
+        downBtn.className = 'sort-btn sort-btn-down';
+        downBtn.addEventListener('click', () => {
+            if (group.nextElementSibling) {
+                group.parentNode.insertBefore(group.nextElementSibling, group);
+                updateSortButtonsState(container);
+            }
+        });
+        sortControls.appendChild(upBtn);
+        sortControls.appendChild(downBtn);
+        group.appendChild(sortControls);
 
         // Label
         const labelDiv = document.createElement('div');
@@ -449,18 +500,21 @@ module.exports = Ferdium => {
         const removeBtn = document.createElement('button');
         removeBtn.className = 'remove-btn';
         removeBtn.textContent = 'Remove';
-        removeBtn.addEventListener('click', () => group.remove());
+        removeBtn.addEventListener('click', () => {
+            group.remove();
+            updateSortButtonsState(container);
+        });
         group.appendChild(removeBtn);
 
         container.appendChild(group);
     }
 
-    function addDropdownToPanel(dropdown = { placeholder: '', options: [] }) {
-        const container = document.getElementById('dropdowns-container');
+    function addDropdownToPanel(dropdown = { placeholder: '', options: [] }, container) {
+        if (!container) container = document.getElementById('dropdowns-container');
         const group = document.createElement('div');
         group.className = 'dropdown-item-group';
 
-        // Placeholder
+        // Placeholder & Main Controls
         const placeholderDiv = document.createElement('div');
         const placeholderLabel = document.createElement('label');
         placeholderLabel.textContent = 'Dropdown Placeholder';
@@ -480,9 +534,37 @@ module.exports = Ferdium => {
         const removeDropdownBtn = document.createElement('button');
         removeDropdownBtn.className = 'remove-btn';
         removeDropdownBtn.textContent = 'Remove Dropdown';
-        removeDropdownBtn.addEventListener('click', () => group.remove());
+        removeDropdownBtn.addEventListener('click', () => {
+             group.remove();
+             updateSortButtonsState(container);
+        });
         inputWrapper.appendChild(removeDropdownBtn);
-        
+
+        // Sort controls for dropdown
+        const sortControls = document.createElement('div');
+        sortControls.className = 'sort-controls';
+        const upBtn = document.createElement('button');
+        upBtn.textContent = '▲';
+        upBtn.className = 'sort-btn sort-btn-up';
+        upBtn.addEventListener('click', () => {
+             if (group.previousElementSibling) {
+                group.parentNode.insertBefore(group, group.previousElementSibling);
+                updateSortButtonsState(container);
+            }
+        });
+        const downBtn = document.createElement('button');
+        downBtn.textContent = '▼';
+        downBtn.className = 'sort-btn sort-btn-down';
+        downBtn.addEventListener('click', () => {
+             if (group.nextElementSibling) {
+                group.parentNode.insertBefore(group.nextElementSibling, group);
+                updateSortButtonsState(container);
+            }
+        });
+        sortControls.appendChild(upBtn);
+        sortControls.appendChild(downBtn);
+        inputWrapper.appendChild(sortControls);
+
         placeholderDiv.appendChild(inputWrapper);
         group.appendChild(placeholderDiv);
 
@@ -504,10 +586,10 @@ module.exports = Ferdium => {
         group.appendChild(addOptionBtn);
 
         // Populate existing options
-        if (dropdown.options.length > 0) {
+        if (dropdown.options && dropdown.options.length > 0) {
             dropdown.options.forEach(opt => addOptionToDropdownPanel(optionsContainer, opt));
         } else {
-             addOptionToDropdownPanel(optionsContainer); // Add one empty option by default
+             addOptionToDropdownPanel(optionsContainer);
         }
 
         container.appendChild(group);
@@ -517,7 +599,6 @@ module.exports = Ferdium => {
         const item = document.createElement('div');
         item.className = 'option-item';
 
-        // Label Input
         const labelInput = document.createElement('input');
         labelInput.type = 'text';
         labelInput.className = 'label-input';
@@ -525,14 +606,12 @@ module.exports = Ferdium => {
         labelInput.value = option.label;
         item.appendChild(labelInput);
 
-        // Text Input
         const textInput = document.createElement('textarea');
         textInput.className = 'text-input';
         textInput.placeholder = 'Snippet Text';
         textInput.value = option.text;
         item.appendChild(textInput);
 
-        // Remove Button
         const removeBtn = document.createElement('button');
         removeBtn.className = 'remove-btn';
         removeBtn.textContent = 'X';
@@ -660,3 +739,4 @@ module.exports = Ferdium => {
         }, 1500);
     });
 };
+
