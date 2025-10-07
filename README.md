@@ -3,24 +3,39 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Ferdium Recipe](https://img.shields.io/badge/Ferdium-Recipe-blueviolet)](https://ferdium.org/)
 
-This recipe enhances the Google Gemini service within the [Ferdium](https://ferdium.org/) application by adding a customizable toolbar for quick insertion of predefined text snippets and a feature to download the content of an active Gemini "Canvas".
+This recipe supercharges the Google Gemini service within the [Ferdium](https://ferdium.org/) application. It adds a powerful, customizable toolbar for quick-access snippets and introduces a complete folder management system to organize your conversations directly within the Gemini sidebar.
 
 ![](https://raw.githubusercontent.com/adromir/assets/refs/heads/main/screenshot-gemeni-mod.png)
-*(A screenshot of the toolbar being on the upper border)*
+*(A screenshot showing the top toolbar and the folder organization in the left sidebar)*
 
 ## ✨ Features
 
-* **📌 Fixed Toolbar:** Adds a persistent toolbar at the top of the Google Gemini interface.
-* **⚡ Quick Snippets:** Define buttons for frequently used phrases or commands. Click a button to instantly append its text to the Gemini input field.
-* **📚 Dropdown Menus:** Organize snippets into multiple dropdown menus for better categorization (e.g., Actions, Translations, Custom Prompts).
+* **🗂️ Conversation Folders:** Organize your chat history like never before!
+    * **Create, Rename, and Delete** folders directly in the sidebar.
+    * **Drag & Drop** conversations into your folders for easy organization.
+    * **Color-Code** your folders for quick visual identification.
+    * **Collapsible** sections to keep your sidebar tidy.
+    * **Right-Click Context Menu** on folders for quick actions (Rename, Change Color, Delete).
+    * **Persistent State:** Your folder structure and conversation assignments are saved locally.
+
+* **📌 Customizable Toolbar:** A persistent toolbar at the top of the Google Gemini interface.
+    * **⚙️ Settings Panel:** No more editing files! A new settings panel allows you to:
+        * Add, remove, and edit buttons and dropdown menus.
+        * **Drag & Drop** to reorder toolbar items.
+        * Configure everything through a user-friendly interface.
+    * **⚡ Quick Snippets:** Create buttons for frequently used phrases or commands. Click a button to instantly append its text to the Gemini input field.
+    * **📚 Dropdown Menus:** Group snippets into multiple dropdown menus for better categorization.
+
 * **📋 Paste from Clipboard:** A dedicated button in the toolbar to paste content from your system clipboard directly into the Gemini input field.
-* **💾 Download Canvas Content:** A new button in the toolbar that allows you to download the content of the currently active/visible Gemini "Canvas".
-    * It cleverly uses the Canvas's own "Copy to Clipboard" functionality.
-    * The filename is automatically derived from the Canvas title.
-    * It attempts to preserve existing file extensions from the Canvas title (e.g., `myScript.js` will be saved as `myScript.js`, not `myScript_js.txt`).
-* **🖱️ Smart Insertion (for Snippets/Paste):** Automatically appends text to the input field, placing the cursor correctly.
-* **🎨 Customizable:** Easily modify the buttons, dropdowns, and snippet text directly within the recipe's `webview.js` file.
-* **🌓 Dark Mode Sync:** Attempts to respect Ferdium's dark mode setting by interacting with `localStorage`.
+
+* **💾 Smart Download Canvas Content:** A powerful download button in the toolbar.
+    * It intelligently detects the type of active "Canvas" (Code or Document).
+    * For **Code Canvases**, it programmatically uses the "Share" and "Copy" functions to get the full, clean code.
+    * For **Document Canvases**, it extracts the text content.
+    * The filename is automatically and safely derived from the Canvas title, preserving existing file extensions (e.g., `myScript.js` is saved correctly).
+
+* **🖱️ Smart Insertion:** Automatically appends text from snippets or the clipboard to the input field, placing the cursor at the end.
+
 * **🔒 CSP Compliant:** Uses safe methods for CSS injection to work with Google's Content Security Policy.
 
 ## 🛠️ Installation Guide
@@ -45,8 +60,8 @@ To use this custom recipe in your Ferdium application, follow these steps:
 
     **Option A: Download ZIP Method (Simpler)**
 
-    * <a href="https://github.com/adromir/google-gemini-mod/archive/refs/heads/main.zip" target="_blank">Download the recipe files</a> (assuming they are provided as a ZIP archive, e.g., `main.zip`).
-    * Extract the ZIP file. You should get a folder named `google-gemini-mod` (or similar, containing `package.json`, `webview.js`, `index.js`).
+    * <a href="https://github.com/adromir/google-gemini-mod/archive/refs/heads/main.zip" target="_blank">Download the recipe files as a ZIP archive</a>.
+    * Extract the ZIP file. You should get a folder named `google-gemini-mod` (or similar).
     * Move this extracted folder **directly** into the `dev` directory you located in Step 1.
 
         *Example Structure:*
@@ -61,24 +76,16 @@ To use this custom recipe in your Ferdium application, follow these steps:
 
     **Option B: Using Git (Fork & Clone - Advanced)**
 
-    * **Fork** the repository containing this recipe to your own GitHub/GitLab account (if available).
-    * **Clone** your forked repository to your local machine:
-        ```bash
-        git clone <your-fork-repository-url>
-        ```
-    * Navigate into the cloned directory and find the specific recipe folder (e.g., `google-gemini-mod`).
-    * **Copy** this recipe folder into the Ferdium `dev` directory located in Step 1.
-
-        *Alternatively*, you can clone the repository *directly* into the `dev` directory:
+    * **Clone** the repository directly into your `dev` directory:
 
         ```bash
         # Navigate to Ferdium's dev recipes directory
         cd <path_to_ferdium_dev_recipes>
 
-        # Clone the specific recipe repository (or your fork) into a folder named 'google-gemini-mod'
-        git clone <repository-url> google-gemini-mod
+        # Clone the repository into a folder named 'google-gemini-mod'
+        git clone [https://github.com/adromir/google-gemini-mod.git](https://github.com/adromir/google-gemini-mod.git) google-gemini-mod
         ```
-        *(Ensure the final folder inside `dev` is named `google-gemini-mod` or matches the `id` in `package.json`)*
+        *(Ensure the final folder inside `dev` matches the `id` in `package.json`)*
 
 **3. Restart or Reload Ferdium:**
 
@@ -92,84 +99,37 @@ To use this custom recipe in your Ferdium application, follow these steps:
     * You should see your custom recipe listed (e.g., "Google Gemini Mod").
     * Select it and add the service as usual.
 
-    The Google Gemini service should now load with the custom snippet toolbar at the top! 🎉
+    The Google Gemini service should now load with the custom folder UI and toolbar! 🎉
 
 ## ⚙️ Customization
 
-You can easily tailor the toolbar buttons and dropdowns to your needs by editing the `webview.js` file within the recipe's folder (`.../Ferdium/recipes/dev/google-gemini-mod/webview.js`).
+### 1. Using the Settings Panel (Recommended)
 
-Open `webview.js` in a text editor. Look for these sections near the top:
+The easiest way to customize the toolbar is through the built-in settings panel.
 
-**1. Customizing Buttons:**
+* **Open the Panel:** Click the **⚙️ Settings** button on the far right of the toolbar.
+* **Add Items:** Click "Add Toolbar Item" and choose between a "Button" or a "Dropdown".
+* **Edit Items:**
+    * Change the `label`, `placeholder`, and `snippet text` for any item.
+    * For dropdowns, you can add or remove individual options.
+* **Reorder Items:** Simply **drag and drop** the item groups within the settings panel to change their order on the toolbar.
+* **Remove Items:** Click the "Remove" button on any item.
+* **Save:** Click "Save & Close" to apply your changes.
 
-    Find the `buttonSnippets` array:
-    ```javascript
-    const buttonSnippets = [
-      { label: "Greeting", text: "Hello Gemini!" },
-      { label: "Explain", text: "Could you please explain ... in more detail?" },
-      // Add more button snippets here
-      // Example: { label: "My Button", text: "My snippet text..." }
-    ];
-    ```
-    * **Edit:** Change the `label` (what appears on the button) and `text` (what gets inserted).
-    * **Add:** Copy an existing line `{ label: "...", text: "..." },` and modify it.
-    * **Remove:** Delete the line corresponding to the button you want to remove.
+### 2. Customizing Download Behavior (Advanced)
 
-**2. Customizing Dropdowns:**
+The download functionality relies on specific CSS selectors to find the active Gemini "Canvas" and its buttons. These are defined as constants at the top of `webview.js`.
 
-    Find the `dropdownConfigurations` array:
-    ```javascript
-    const dropdownConfigurations = [
-      {
-        placeholder: "Actions...", // Text shown before selection
-        options: [
-          { label: "Summarize", text: "Please summarize the following text:\n" },
-          { label: "Ideas", text: "Give me 5 ideas for ..." },
-          // Add more options here: { label: "Option Name", text: "Snippet..." }
-        ]
-      },
-      {
-        placeholder: "Translations",
-        options: [
-          { label: "DE -> EN", text: "Translate the following into English:\n" },
-          { label: "EN -> DE", text: "Translate the following into German:\n" },
-        ]
-      },
-      // Add more dropdown objects here
-      // Example:
-      // {
-      //   placeholder: "My Prompts",
-      //   options: [
-      //     { label: "Blog Post Idea", text: "Generate 5 blog post ideas about..." },
-      //     { label: "Email Draft", text: "Draft a polite email regarding..." }
-      //   ]
-      // }
-    ];
-    ```
-    * **Edit Options:** Modify the `label` and `text` within the `options` array of a specific dropdown.
-    * **Add Options:** Add more `{ label: "...", text: "..." }` objects to an existing `options` array.
-    * **Edit Placeholder:** Change the `placeholder` text for a dropdown.
-    * **Add Dropdowns:** Copy an entire dropdown object `{ placeholder: "...", options: [...] },` and customize it.
-    * **Remove Dropdowns/Options:** Delete the relevant lines or objects.
+If the download feature stops working after a Gemini UI update, these selectors might need to be updated by inspecting the Gemini webpage elements with browser developer tools.
 
-**3. Customizing Download Behavior (Advanced):**
-
-    The download functionality relies on specific CSS selectors to find the active Gemini "Canvas" and its internal "Copy to Clipboard" button. These are defined as constants in `webview.js`:
-    ```javascript
-    const GEMINI_CANVAS_WRAPPER_SELECTOR = "..."; // Identifies the main canvas container
-    const GEMINI_CANVAS_TITLE_TEXT_SELECTOR = "..."; // Finds the title text within the canvas
-    const GEMINI_CANVAS_COPY_BUTTON_SELECTOR = "..."; // CRITICAL: Finds the "Copy" button within the canvas
-    ```
-    If the download feature stops working after a Gemini UI update, these selectors (especially `GEMINI_CANVAS_COPY_BUTTON_SELECTOR`) might need to be updated by inspecting the Gemini webpage elements with browser developer tools.
-
-**Important:** After saving changes to `webview.js`, you must reload the recipe in Ferdium for the changes to take effect:
+**Important:** After making any manual changes to `webview.js`, you must reload the recipe in Ferdium for the changes to take effect:
 * Right-click on the Gemini service tab in Ferdium and select "Reload service".
 * Or, use the Development menu: "Reload Recipes" / "Reload Ferdium" (`Ctrl+Shift+R` / `Cmd+Shift+R`).
 
 ## 📝 Notes
-* The CSS styles are embedded directly in `webview.js` for compatibility with Google's security policies. You can modify the `embeddedCSS` constant within the script if you need to adjust the toolbar's appearance.
-* Ensure you have a stable internet connection when using the service.
-* The download feature relies on programmatic clicking of the canvas's "Copy" button and then reading from the clipboard. This requires clipboard permissions to be granted to the browser/Ferdium.
+* The CSS styles are embedded directly in `webview.js` for compatibility with Google's security policies.
+* The folder and toolbar configurations are saved in your browser's `localStorage`. Clearing your Ferdium cache may reset your settings.
+* The download feature relies on programmatic clicking and clipboard access. This requires clipboard permissions to be granted to the browser/Ferdium.
 
 ## 📜 Disclaimer
 
@@ -179,7 +139,7 @@ The author, Adromir, and contributors are not responsible for any issues or data
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details (though one is not explicitly provided, the MIT terms apply).
+This project is licensed under the MIT License.
 
 Copyright (c) 2024 Adromir - <https://github.com/adromir>
 
