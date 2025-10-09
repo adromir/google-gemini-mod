@@ -1,7 +1,7 @@
 {
   "id": "google-gemini-mod",
   "name": "Google Gemini Mod",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "config": {
     "serviceURL": "https://gemini.google.com"

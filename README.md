@@ -1,147 +1,103 @@
-# Ferdium Recipe: Google Gemini Mod 🚀
+# 🚀 Google Gemini Mod for Ferdium
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Ferdium Recipe](https://img.shields.io/badge/Ferdium-Recipe-blueviolet)](https://ferdium.org/)
+![Version](https://img.shields.io/badge/Version-0.6.0-blue.svg)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
+![Platform](https://img.shields.io/badge/Platform-Ferdium-brightgreen.svg)
 
-This recipe supercharges the Google Gemini service within the [Ferdium](https://ferdium.org/) application. It adds a powerful, customizable toolbar for quick-access snippets and introduces a complete folder management system to organize your conversations directly within the Gemini sidebar.
+A powerful enhancement script for the Google Gemini web interface, designed to run as a Ferdium recipe. This mod introduces a suite of features aimed at improving productivity and organization, including a customizable quick-access toolbar, drag-and-drop chat folders, and a content download utility.
 
-![](https://raw.githubusercontent.com/adromir/assets/refs/heads/main/screenshot-gemeni-mod.png)
-*(A screenshot showing the top toolbar and the folder organization in the left sidebar)*
+---
 
-## ✨ Features
+## ✨ Key Features
 
-* **🗂️ Conversation Folders:** Organize your chat history like never before!
-    * **Create, Rename, and Delete** folders directly in the sidebar.
-    * **Drag & Drop** conversations into your folders for easy organization.
-    * **Color-Code** your folders for quick visual identification.
-    * **Collapsible** sections to keep your sidebar tidy.
-    * **Right-Click Context Menu** on folders for quick actions (Rename, Change Color, Delete).
-    * **Persistent State:** Your folder structure and conversation assignments are saved locally.
+* **📌 Customizable Toolbar:** A floating toolbar at the top of the screen for quick access to predefined text snippets, clipboard content, and other actions.
+* **🗂️ Drag & Drop Folders:** Organize your Gemini conversations into collapsible, color-coded folders directly in the chat history sidebar.
+* **⚙️ Graphical Settings Manager:** An intuitive interface to add, remove, and reorder toolbar buttons and dropdowns. No more manual JSON editing!
+* **💾 Canvas Downloader:** A one-click tool to download the content from an active "code canvas" or "document canvas" as a text file.
+* **🎨 Folder Customization:** Rename folders, assign custom colors, and easily manage your chat organization.
+* **🖱️ Lightweight D&D:** Uses a custom, zero-dependency drag-and-drop implementation for smooth and reliable performance within the Gemini interface.
 
-* **📌 Customizable Toolbar:** A persistent toolbar at the top of the Google Gemini interface.
-    * **⚙️ Settings Panel:** No more editing files! A new settings panel allows you to:
-        * Add, remove, and edit buttons and dropdown menus.
-        * **Drag & Drop** to reorder toolbar items.
-        * Configure everything through a user-friendly interface.
-    * **⚡ Quick Snippets:** Create buttons for frequently used phrases or commands. Click a button to instantly append its text to the Gemini input field.
-    * **📚 Dropdown Menus:** Group snippets into multiple dropdown menus for better categorization.
+---
 
-* **📋 Paste from Clipboard:** A dedicated button in the toolbar to paste content from your system clipboard directly into the Gemini input field.
+## 🔧 Installation
 
-* **💾 Smart Download Canvas Content:** A powerful download button in the toolbar.
-    * It intelligently detects the type of active "Canvas" (Code or Document).
-    * For **Code Canvases**, it programmatically uses the "Share" and "Copy" functions to get the full, clean code.
-    * For **Document Canvases**, it extracts the text content.
-    * The filename is automatically and safely derived from the Canvas title, preserving existing file extensions (e.g., `myScript.js` is saved correctly).
+You can install this recipe either manually or by using Git.
 
-* **🖱️ Smart Insertion:** Automatically appends text from snippets or the clipboard to the input field, placing the cursor at the end.
+### Method 1: Using Git (Recommended)
 
-* **🔒 CSP Compliant:** Uses safe methods for CSS injection to work with Google's Content Security Policy.
+This method allows for easy updates.
 
-## 🛠️ Installation Guide
+1.  Open a terminal or command prompt.
+2.  Navigate to your Ferdium recipes directory:
+    * **Windows:** `cd %APPDATA%\Ferdium\recipes\`
+    * **macOS:** `cd ~/Library/Application\ Support/Ferdium/recipes/`
+    * **Linux:** `cd ~/.config/Ferdium/recipes/`
+3.  Clone the repository into a new folder. **Note:** Replace `gemini-mod` with your actual repository name if it's different.
+    ```bash
+    git clone https://github.com/adromir/gemini-mod.git
+    ```
+4.  Restart Ferdium. The "Gemini Mod" service will now be available to add from the Ferdium settings.
 
-To use this custom recipe in your Ferdium application, follow these steps:
+### Method 2: Manual Installation
 
-**1. Locate your Ferdium `dev` Recipe Directory:**
+1.  Navigate to your Ferdium recipes directory (see paths above).
+2.  Create a new folder for the recipe, e.g., `gemini-mod`.
+3.  Download the project files (`index.js`, `webview.js`, `Sortable.js`) and place them inside this new folder.
+4.  Restart Ferdium.
 
-    The location depends on your operating system:
+---
 
-    * **Windows:** `%APPDATA%\Ferdium\recipes\dev\`
-        (Usually `C:\Users\<YourUsername>\AppData\Roaming\Ferdium\recipes\dev\`)
-    * **macOS:** `~/Library/Application Support/Ferdium/recipes/dev/`
-        (You might need to press `Cmd+Shift+G` in Finder and paste the path)
-    * **Linux:** `~/.config/Ferdium/recipes/dev/`
+## 📖 Usage
 
-    If the `dev` directory doesn't exist, create it.
+### The Toolbar
 
-**2. Get the Recipe Files:**
+The toolbar appears at the top-center of the Gemini window and provides several functions:
 
-    You have two options:
+* **Custom Buttons/Dropdowns:** Click any of the custom buttons or select an option from a dropdown to instantly insert your predefined text into the Gemini input field.
+* **📋 Paste:** Clicks this button to paste the current content from your clipboard into the input field.
+* **💾 Download:** When a code or document canvas is open, click this button to download its content. The script automatically determines a suitable filename.
+* **⚙️ Settings:** Opens the settings panel where you can customize the toolbar and manage other mod settings.
 
-    **Option A: Download ZIP Method (Simpler)**
+### Folder Management
 
-    * <a href="https://github.com/adromir/google-gemini-mod/archive/refs/heads/main.zip" target="_blank">Download the recipe files as a ZIP archive</a>.
-    * Extract the ZIP file. You should get a folder named `google-gemini-mod` (or similar).
-    * Move this extracted folder **directly** into the `dev` directory you located in Step 1.
+The folder UI is injected at the top of the chat history list.
 
-        *Example Structure:*
-        ```
-        .../Ferdium/recipes/dev/
-                                └── google-gemini-mod/
-                                    ├── package.json
-                                    ├── webview.js
-                                    ├── index.js
-                                    └── (Optional: icon.svg/png if included)
-        ```
+* **➕ Create a Folder:** Click the "**＋ New Folder**" button. You will be prompted to enter a name for the new folder.
+* **📂 Organize Chats:** Simply drag any conversation from the main list and drop it into a folder. You can also move conversations between folders.
+* **▶️ Toggle Folders:** Click on a folder's header to expand or collapse its content.
+* **⋮ Folder Options:** Click the vertical ellipsis (`⋮`) on a folder to open its context menu, which allows you to:
+    * **Rename:** Change the folder's name.
+    * **Change Color:** Select a new color from a predefined palette or enter a custom hex code.
+    * **Delete Folder:** Remove the folder. Conversations within it will be moved back to the main chat list.
 
-    **Option B: Using Git (Fork & Clone - Advanced)**
+### The Settings Panel
 
-    * **Clone** the repository directly into your `dev` directory:
+The settings panel allows for easy, code-free customization.
 
-        ```bash
-        # Navigate to Ferdium's dev recipes directory
-        cd <path_to_ferdium_dev_recipes>
+* **Toolbar Items:**
+    * **Reorder:** Drag and drop toolbar items to change their order.
+    * **Add:** Click "**Add Toolbar Item**" and choose between a "Button" or a "Dropdown".
+    * **Edit:** Modify the labels, text snippets, and options for any item.
+    * **Remove:** Click the "**Remove**" button on an item to delete it.
+* **Folder Settings:**
+    * **Reset All Folder Data:** This option will permanently delete all your created folders and chat-to-folder assignments. A confirmation is required.
+* **Saving:** Click "**Save & Close**" to apply your changes or "**Cancel**" to discard them.
 
-        # Clone the repository into a folder named 'google-gemini-mod'
-        git clone [https://github.com/adromir/google-gemini-mod.git](https://github.com/adromir/google-gemini-mod.git) google-gemini-mod
-        ```
-        *(Ensure the final folder inside `dev` matches the `id` in `package.json`)*
+---
 
-**3. Restart or Reload Ferdium:**
+##  Disclaimer
 
-    * Completely quit and restart Ferdium.
-    * *Or*, if Ferdium is running, use `Ctrl+Shift+R` / `Cmd+Shift+R` to reload Ferdium.
+This script is provided "as is", without warranty of any kind, express or implied. The author, Adromir, is not responsible for any damage or data loss that may result from its use. You use this script at your own risk. This project is not affiliated with, endorsed by, or sponsored by Google.
 
-**4. Add the Custom Service:**
+---
 
-    * In Ferdium, click the "+" button to add a new service.
-    * Click the "Own Services" Button (or search for the recipe name).
-    * You should see your custom recipe listed (e.g., "Google Gemini Mod").
-    * Select it and add the service as usual.
-
-    The Google Gemini service should now load with the custom folder UI and toolbar! 🎉
-
-## ⚙️ Customization
-
-### 1. Using the Settings Panel (Recommended)
-
-The easiest way to customize the toolbar is through the built-in settings panel.
-
-* **Open the Panel:** Click the **⚙️ Settings** button on the far right of the toolbar.
-* **Add Items:** Click "Add Toolbar Item" and choose between a "Button" or a "Dropdown".
-* **Edit Items:**
-    * Change the `label`, `placeholder`, and `snippet text` for any item.
-    * For dropdowns, you can add or remove individual options.
-* **Reorder Items:** Simply **drag and drop** the item groups within the settings panel to change their order on the toolbar.
-* **Remove Items:** Click the "Remove" button on any item.
-* **Save:** Click "Save & Close" to apply your changes.
-
-### 2. Customizing Download Behavior (Advanced)
-
-The download functionality relies on specific CSS selectors to find the active Gemini "Canvas" and its buttons. These are defined as constants at the top of `webview.js`.
-
-If the download feature stops working after a Gemini UI update, these selectors might need to be updated by inspecting the Gemini webpage elements with browser developer tools.
-
-**Important:** After making any manual changes to `webview.js`, you must reload the recipe in Ferdium for the changes to take effect:
-* Right-click on the Gemini service tab in Ferdium and select "Reload service".
-* Or, use the Development menu: "Reload Recipes" / "Reload Ferdium" (`Ctrl+Shift+R` / `Cmd+Shift+R`).
-
-## 📝 Notes
-* The CSS styles are embedded directly in `webview.js` for compatibility with Google's security policies.
-* The folder and toolbar configurations are saved in your browser's `localStorage`. Clearing your Ferdium cache may reset your settings.
-* The download feature relies on programmatic clicking and clipboard access. This requires clipboard permissions to be granted to the browser/Ferdium.
-
-## 📜 Disclaimer
-
-This recipe is a community-driven effort and is not officially supported by Google or Ferdium. It modifies the Gemini web interface, and future updates to Gemini might break its functionality. Use at your own risk.
-
-The author, Adromir, and contributors are not responsible for any issues or data loss that may arise from using this recipe.
-
-## 📄 License
+## 📜 License
 
 This project is licensed under the MIT License.
 
-Copyright (c) 2024 Adromir - <https://github.com/adromir>
+**MIT License**
+
+Copyright (c) 2025 Adromir
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -160,3 +116,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+*Created by [Adromir](https://github.com/adromir)*
