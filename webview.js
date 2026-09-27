@@ -18,10 +18,10 @@ module.exports = Ferdium => {
 
 
 	const GEMINI_INPUT_FIELD_SELECTORS = ['div[role="textbox"]', '.ql-editor p', '.ql-editor', 'div[contenteditable="true"]'];
-	const FOLDER_CHAT_ITEM_SELECTOR = 'div[data-test-id="conversation"]';
-	const FOLDER_CHAT_CONTAINER_SELECTOR = '.conversation-items-container';
-	const FOLDER_CHAT_LIST_CONTAINER_SELECTOR = 'conversations-list .conversations-container';
-	const FOLDER_INJECTION_POINT_SELECTOR = 'div.chat-history-list';
+	const FOLDER_CHAT_ITEM_SELECTOR = 'gem-nav-list-item, div[data-test-id="conversation"]';
+	const FOLDER_CHAT_CONTAINER_SELECTOR = 'gem-nav-list-item, .conversation-items-container';
+	const FOLDER_CHAT_LIST_CONTAINER_SELECTOR = 'conversations-list mat-nav-list, mat-nav-list, conversations-list .conversations-container';
+	const FOLDER_INJECTION_POINT_SELECTOR = '#sidenav-section-content-chats, conversations-list, div.chat-history-list, .conversations-list';
 
 	// --- Download Feature Configuration ---
 	const DEFAULT_DOWNLOAD_EXTENSION = "txt";
@@ -192,7 +192,8 @@ module.exports = Ferdium => {
 		.folder.closed .folder-content { max-height: 0; padding-top: 0; padding-bottom: 0; min-height: 0; overflow: hidden; }
         
         /* Style the conversation items within the folder to look like list items */
-        .folder-content .conversation-items-container {
+        .folder-content .conversation-items-container,
+        .folder-content gem-nav-list-item {
             background-color: var(--surface-1);
             border-radius: 6px;
             margin: 0 4px;
@@ -202,21 +203,23 @@ module.exports = Ferdium => {
             display: flex;
             align-items: center;
         }
-        .folder-content .conversation-items-container::before {
+        .folder-content .conversation-items-container::before,
+        .folder-content gem-nav-list-item::before {
             content: "•";
             margin: 0 6px 0 10px;
             color: var(--on-surface);
             font-size: 1.2em;
             line-height: 1;
         }
-        .folder-content .conversation-items-container:hover {
+        .folder-content .conversation-items-container:hover,
+        .folder-content gem-nav-list-item:hover {
             background-color: var(--surface-2);
             border-color: var(--surface-5);
         }
 
 		#add-folder-btn { width: 100%; margin: 8px 0; padding: 10px; border: none; background-color: var(--primary-surface); color: var(--on-primary-surface); border-radius: 8px; cursor: pointer; font-weight: 500; }
 		#add-folder-btn:hover { opacity: 0.9; }
-		.conversation-items-container { cursor: grab; }
+		.conversation-items-container, gem-nav-list-item { cursor: grab; }
 		.folder-context-menu { position: absolute; z-index: 10000; background-color: #333333; border: 1px solid var(--surface-4); border-radius: 8px; padding: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); display: none; }
 		.folder-context-menu-item { padding: 8px 12px; cursor: pointer; border-radius: 4px; white-space: nowrap; font-family: 'Roboto', Arial, sans-serif !important; color: #FFFFFF; }
 		.folder-context-menu-item:hover { background-color: var(--surface-4); }
@@ -478,21 +481,21 @@ module.exports = Ferdium => {
 
 	function getIdentifierFromElement(el) {
 		if (!el) return null;
-		if (el.matches(FOLDER_CHAT_CONTAINER_SELECTOR)) {
+		if (el.matches && el.matches(FOLDER_CHAT_CONTAINER_SELECTOR)) {
 			el = el.querySelector(FOLDER_CHAT_ITEM_SELECTOR) || el;
 		}
-		const anchor = el.closest('a');
+		const anchor = (el.tagName === 'A' ? el : null) || el.querySelector('a') || el.closest('a');
 		if (anchor) {
-			const href = anchor.getAttribute('href') || '';
-			const m = href.match(/\/conversation\/([A-Za-z0-9_-]+)/);
+			const href = anchor.getAttribute('href') || anchor.href || '';
+			const m = href.match(/\/(?:app|conversation)\/([A-Za-z0-9_-]+)/);
 			if (m) return m[1];
 		}
-		const jslog = el.getAttribute('jslog') || '';
+		const jslog = (el.getAttribute && el.getAttribute('jslog')) || '';
 		let m = jslog.match(/"c_([A-Za-z0-9_-]+)"/);
 		if (!m) m = jslog.match(/c_([A-Za-z0-9_-]+)/);
 		if (m) return m[1];
-		const t = el.querySelector('.conversation-title');
-		if (t) return `title:${t.textContent.trim()}`;
+		const t = el.querySelector('.conversation-title, [data-test-id="conversation-title"]') || anchor?.querySelector('span span span span');
+		if (t && t.textContent.trim()) return `title:${t.textContent.trim()}`;
 		return null;
 	}
 
@@ -502,7 +505,7 @@ module.exports = Ferdium => {
 
 		const chatListContainer = document.querySelector(FOLDER_CHAT_LIST_CONTAINER_SELECTOR);
 		if (chatListContainer) {
-			container.querySelectorAll(FOLDER_CHAT_CONTAINER_SELECTOR).forEach(item => {
+			container.querySelectorAll('.folder-content > *').forEach(item => {
 				chatListContainer.appendChild(item);
 			});
 		}
@@ -592,16 +595,22 @@ module.exports = Ferdium => {
 		const folderIds = new Set(folders.map(f => f.id));
 		let dataWasCorrected = false;
 
-		document.querySelectorAll('.folder-content ' + FOLDER_CHAT_CONTAINER_SELECTOR).forEach(item => {
-			const convoEl = item.querySelector(FOLDER_CHAT_ITEM_SELECTOR);
-			const identifier = getIdentifierFromElement(convoEl);
-			if (!identifier || !conversationFolders[identifier] || !folderIds.has(conversationFolders[identifier])) {
-				chatListContainer.appendChild(item);
-			}
+		document.querySelectorAll('.folder-content').forEach(fc => {
+			Array.from(fc.children).forEach(item => {
+				const convoEl = (item.matches && item.matches(FOLDER_CHAT_ITEM_SELECTOR))
+					? item
+					: (item.querySelector(FOLDER_CHAT_ITEM_SELECTOR) || item);
+				const identifier = getIdentifierFromElement(convoEl);
+				if (!identifier || !conversationFolders[identifier] || !folderIds.has(conversationFolders[identifier])) {
+					chatListContainer.appendChild(item);
+				}
+			});
 		});
 
 		Array.from(chatListContainer.children).forEach(itemToMove => {
-			const convoEl = itemToMove.querySelector(FOLDER_CHAT_ITEM_SELECTOR);
+			const convoEl = (itemToMove.matches && itemToMove.matches(FOLDER_CHAT_ITEM_SELECTOR))
+				? itemToMove
+				: (itemToMove.querySelector(FOLDER_CHAT_ITEM_SELECTOR) || itemToMove);
 			const identifier = getIdentifierFromElement(convoEl);
 			if (!identifier) return;
 
@@ -616,6 +625,7 @@ module.exports = Ferdium => {
 			if (folderId) {
 				const folderContent = document.querySelector(`.folder[data-folder-id="${folderId}"] .folder-content`);
 				if (folderContent && !folderContent.contains(itemToMove)) {
+					itemToMove.classList.add('conversation-items-container');
 					folderContent.appendChild(itemToMove);
 				}
 			}
@@ -681,13 +691,30 @@ module.exports = Ferdium => {
 	}
 
 	function initializeFolders() {
-		const injectionPoint = document.querySelector(FOLDER_INJECTION_POINT_SELECTOR);
-		if (!injectionPoint) return false;
-
 		if (document.getElementById('folder-ui-container')) {
 			organizeConversations();
 			return true;
 		}
+
+		let targetNode = null;
+		let insertBefore = false;
+
+		const convosList = document.querySelector('conversations-list, div.chat-history-list, .conversations-list');
+		const chatsSection = document.querySelector('#sidenav-section-content-chats');
+		const headers = document.querySelectorAll('button.expandable-section-header, div.expandable-section-header, .expandable-section-header, #sidenav-section-header-chats, [aria-controls="sidenav-section-content-chats"]');
+
+		if (convosList) {
+			targetNode = convosList;
+			insertBefore = true;
+		} else if (chatsSection) {
+			targetNode = chatsSection;
+			insertBefore = false;
+		} else if (headers.length > 0) {
+			targetNode = headers.length >= 2 ? headers[1] : headers[0];
+			insertBefore = true;
+		}
+
+		if (!targetNode) return false;
 
 		const uiContainer = document.createElement('div');
 		uiContainer.id = 'folder-ui-container';
@@ -699,8 +726,30 @@ module.exports = Ferdium => {
 		folderContainer.id = 'folder-container';
 		uiContainer.appendChild(addButton);
 		uiContainer.appendChild(folderContainer);
-		injectionPoint.prepend(uiContainer);
+
+		if (insertBefore && targetNode.parentNode) {
+			targetNode.parentNode.insertBefore(uiContainer, targetNode);
+		} else {
+			targetNode.prepend(uiContainer);
+		}
+
 		renderFolders();
+
+		// Attach MutationObserver to observe conversation list additions
+		const chatList = document.querySelector(FOLDER_CHAT_LIST_CONTAINER_SELECTOR) || targetNode;
+		if (chatList && !chatList.dataset.geminiModObserved) {
+			chatList.dataset.geminiModObserved = 'true';
+			let debounceTimer = null;
+			const observer = new MutationObserver(() => {
+				clearTimeout(debounceTimer);
+				debounceTimer = setTimeout(() => {
+					organizeConversations();
+					setupDragAndDrop();
+				}, 150);
+			});
+			observer.observe(chatList, { childList: true, subtree: true });
+		}
+
 		return true;
 	}
 
@@ -969,13 +1018,19 @@ module.exports = Ferdium => {
 		let count = 0;
 		document.querySelectorAll('.folder').forEach(folderEl => {
 			const folderId = folderEl.dataset.folderId;
-			folderEl.querySelectorAll(FOLDER_CHAT_CONTAINER_SELECTOR).forEach(item => {
-				const id = getIdentifierFromElement(item.querySelector(FOLDER_CHAT_ITEM_SELECTOR));
-				if (id) {
-					newConversationFolders[id] = folderId;
-					count++;
-				}
-			});
+			const folderContent = folderEl.querySelector('.folder-content');
+			if (folderContent) {
+				Array.from(folderContent.children).forEach(item => {
+					const convoEl = (item.matches && item.matches(FOLDER_CHAT_ITEM_SELECTOR))
+						? item
+						: (item.querySelector(FOLDER_CHAT_ITEM_SELECTOR) || item);
+					const id = getIdentifierFromElement(convoEl);
+					if (id) {
+						newConversationFolders[id] = folderId;
+						count++;
+					}
+				});
+			}
 		});
 		console.log(`Gemini Mod: Rebuilt state. Found ${count} conversations in folders.`);
 		conversationFolders = newConversationFolders;

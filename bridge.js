@@ -168,6 +168,12 @@ const Bridge = {
             const el = document.querySelector(selector);
             if (!el) return;
 
+            if (window.Sortable.get(el)) {
+                try {
+                    window.Sortable.get(el).destroy();
+                } catch (e) {}
+            }
+
             const defaultOptions = {
                 animation: 150,
                 delay: 100,
@@ -182,10 +188,16 @@ const Bridge = {
                     document.dispatchEvent(new CustomEvent('GEMINI_SORT_UPDATE', {
                         detail: { newOrder: newOrder, container: selector }
                     }));
+                },
+                onAdd: function (evt) {
+                    document.dispatchEvent(new CustomEvent('GEMINI_SORT_UPDATE', {
+                        detail: { newOrder: [], container: selector }
+                    }));
                 }
             };
             const finalOptions = { ...defaultOptions, ...options };
             finalOptions.onEnd = defaultOptions.onEnd;
+            finalOptions.onAdd = defaultOptions.onAdd;
             new window.Sortable(el, finalOptions);
         }
     }
