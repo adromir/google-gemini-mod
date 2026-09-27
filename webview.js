@@ -1,4 +1,13 @@
 const path = require('path');
+let Sortable;
+try {
+	Sortable = require(path.join(__dirname, 'sortable.min.js'));
+	if (Sortable && Sortable.default) {
+		Sortable = Sortable.default;
+	}
+} catch (e) {
+	console.error("Gemini Mod: Failed to load sortable.min.js via require:", e);
+}
 
 module.exports = Ferdium => {
 	// ===================================================================================
@@ -60,6 +69,13 @@ module.exports = Ferdium => {
 	// Helper to get window object with libraries (handling potential isolation)
 	function getPageWindow() {
 		return window;
+	}
+
+	if (!Sortable && typeof window !== 'undefined' && window.Sortable) {
+		Sortable = window.Sortable;
+	}
+	if (Sortable && typeof window !== 'undefined' && !window.Sortable) {
+		window.Sortable = Sortable;
 	}
 
 	// ===================================================================================
@@ -158,87 +174,162 @@ module.exports = Ferdium => {
 		}
 
 		/* --- Folder UI Styles --- */
-		#folder-ui-container { padding: 0 8px; }
-		#folder-container { padding-bottom: 8px; border-bottom: 1px solid var(--surface-3); }
-		.folder { margin-bottom: 5px; border-radius: 8px; overflow: hidden; }
-		.folder-header { display: flex; align-items: center; padding: 10px; cursor: pointer; background-color: var(--surface-2); position: relative; }
-		.folder-header:hover { background-color: var(--surface-3); }
-        
-        /* Folder Icon Styles */
-        .folder-icon-wrapper { margin-right: 10px; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; }
-        .folder-icon { width: 20px; height: 20px; transition: transform 0.2s ease; }
-        .folder.closed .icon-open { display: none; }
-        .folder:not(.closed) .icon-closed { display: none; }
-        
-		.folder-name { flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'Roboto', Arial, sans-serif !important; font-weight: 500; }
-		.folder-controls { display: flex; align-items: center; margin-left: 5px; }
-		.folder-toggle-icon { transition: transform 0.2s; margin-right: 5px; font-size: 0.8em; opacity: 0.7; }
-		.folder.closed .folder-toggle-icon { transform: rotate(-90deg); }
-		.folder-options-btn { background: none; border: none; color: inherit; cursor: pointer; padding: 2px 4px; border-radius: 4px; margin-left: 4px; font-size: 1.2em; line-height: 1; }
-		.folder-options-btn:hover { background-color: rgba(255,255,255,0.1); }
+		/* Match Gemini sidebar design: Google Sans font, Material colors, proper spacing */
+		#folder-ui-container {
+			display: block;
+			width: 100%;
+			margin: 0 !important;
+			padding: 0;
+			font-family: "Google Sans Flex","Google Sans Text","Google Sans",sans-serif;
+		}
+
+		/* --- Section header: matches "Notebooks" style --- */
+		#folder-section-header {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			width: 100%;
+			box-sizing: border-box;
+			padding: 0 16px;
+			min-height: 36px;
+			background: transparent;
+			border: none;
+			cursor: pointer;
+			text-align: left;
+			color: inherit;
+			font-family: inherit;
+			margin: 0;
+			gap: 8px;
+		}
+		#folder-section-header:hover {
+			background-color: var(--mat-list-list-item-hover-state-layer-color, rgba(227, 227, 227, 0.08));
+		}
+		#folder-section-header .expandable-section-title {
+			flex: 1;
+		}
 		
-        /* List View Styles for Content */
-		.folder-content { 
-            max-height: 500px; 
-            overflow-y: auto; 
-            transition: max-height 0.3s ease-in-out, padding 0.3s ease-in-out; 
-            background-color: transparent; /* Transparent to let items stand out */
-            min-height: 10px; 
-            display: flex;
-            flex-direction: column;
-            gap: 4px; /* Gap between items */
-            padding: 4px 0;
-        }
-		.folder.closed .folder-content { max-height: 0; padding-top: 0; padding-bottom: 0; min-height: 0; overflow: hidden; }
-        
-        /* Style the conversation items within the folder to look like list items */
-        .folder-content .conversation-items-container,
-        .folder-content gem-nav-list-item {
-            background-color: var(--surface-1);
-            border-radius: 6px;
-            margin: 0 4px;
-            padding: 2px 0;
-            border: 1px solid var(--surface-4);
-            transition: background-color 0.2s;
-            display: flex;
-            align-items: center;
-        }
-        .folder-content .conversation-items-container::before,
-        .folder-content gem-nav-list-item::before {
-            content: "•";
-            margin: 0 6px 0 10px;
-            color: var(--on-surface);
-            font-size: 1.2em;
-            line-height: 1;
-        }
-        .folder-content .conversation-items-container:hover,
-        .folder-content gem-nav-list-item:hover {
-            background-color: var(--surface-2);
-            border-color: var(--surface-5);
-        }
+		/* Folder Items & Add Button */
+		#folder-container { padding-bottom: 4px; }
+		
+		#add-folder-btn, .folder-header {
+			display: flex; flex-direction: row; align-items: center; justify-content: flex-start;
+			width: 100%; box-sizing: border-box;
+			padding: 0 16px; min-height: 36px;
+			background: transparent; border: none; color: inherit;
+			border-radius: 9999px; cursor: pointer; text-align: left;
+			position: relative;
+		}
+		#add-folder-btn:hover, .folder-header:hover {
+			background-color: var(--mat-list-list-item-hover-state-layer-color, rgba(227, 227, 227, 0.08)) !important;
+		}
+		
+		.add-folder-icon, .folder-icon-wrapper { 
+			margin-right: 12px; display: flex; align-items: center; justify-content: center;
+		}
 
-		#add-folder-btn { width: 100%; margin: 8px 0; padding: 10px; border: none; background-color: var(--primary-surface); color: var(--on-primary-surface); border-radius: 8px; cursor: pointer; font-weight: 500; }
-		#add-folder-btn:hover { opacity: 0.9; }
+		/* Folder Specific */
+		.folder { margin: 0; padding: 0; overflow: visible; }
+		.folder-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 0; padding-right: 28px; }
+
+		.folder-controls { position: absolute; right: 12px; display: none; align-items: center; gap: 4px; flex-shrink: 0; z-index: 10; }
+		.folder:hover .folder-controls { display: flex; }
+		.folder-controls button {
+			background: transparent !important; color: #a8c7fa !important; border: none; font-size: 14px;
+			cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: background-color 0.2s;
+		}
+		.folder-toggle-icon { transition: transform 0.2s; font-size: 0.7em; opacity: 0.6; color: #c4c7c5; }
+		.folder.closed .folder-toggle-icon { transform: rotate(-90deg); }
+		.folder-options-btn {
+			background: none; border: none; color: #c4c7c5; cursor: pointer;
+			padding: 4px; border-radius: 50%; width: 28px; height: 28px;
+			display: flex; align-items: center; justify-content: center;
+			font-size: 1.1em; line-height: 1;
+			opacity: 0;
+			transition: opacity 0.15s, background-color 0.15s;
+		}
+		.folder-header:hover .folder-options-btn { opacity: 1; }
+		.folder-options-btn:hover { background-color: rgba(227, 227, 227, 0.12); }
+
+		/* Folder content area - items inside */
+		.folder-content {
+			min-height: 0;
+			max-height: 600px;
+			overflow: hidden;
+			transition: max-height 0.25s ease-in-out;
+		}
+		.folder.closed .folder-content { max-height: 0; }
+
+		/* Chat items inside folders - match gem-nav-list-item look */
+		.folder-content .conversation-items-container,
+		.folder-content gem-nav-list-item {
+			display: block;
+			border-radius: 9999px;
+			margin: 0 8px;
+			padding: 0;
+			border: none;
+			transition: background-color 0.15s;
+			position: relative;
+		}
+		.folder-content .conversation-items-container::before,
+		.folder-content gem-nav-list-item::before {
+			content: none;
+		}
+		.folder-content .conversation-items-container:hover,
+		.folder-content gem-nav-list-item:hover {
+			background-color: var(--mat-list-list-item-hover-state-layer-color, rgba(227, 227, 227, 0.08));
+		}
+
+		/* "New Folder" button matching Gemini's nav style */
+		#add-folder-btn {
+			width: calc(100% - 16px) !important;
+			margin: 2px 8px !important;
+			color: #c4c7c5;
+			font-family: "Google Sans Flex","Google Sans Text","Google Sans",sans-serif;
+			font-size: 0.875rem;
+			font-weight: 400;
+			gap: 0 !important;
+		}
+		#add-folder-btn::before { content: none !important; }
+		#add-folder-btn:hover { background-color: color-mix(in srgb, #e3e3e3 8%, transparent); color: #e3e3e3; }
+
 		.conversation-items-container, gem-nav-list-item { cursor: grab; }
-		.folder-context-menu { position: absolute; z-index: 10000; background-color: #333333; border: 1px solid var(--surface-4); border-radius: 8px; padding: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); display: none; }
-		.folder-context-menu-item { padding: 8px 12px; cursor: pointer; border-radius: 4px; white-space: nowrap; font-family: 'Roboto', Arial, sans-serif !important; color: #FFFFFF; }
-		.folder-context-menu-item:hover { background-color: var(--surface-4); }
-		.folder-context-menu-item.delete { color: #DB4437; }
-        .sortable-ghost { opacity: 0.4; background: var(--primary-surface-hover); }
-        .item-group.sortable-ghost { background-color: #555 !important; }
 
+		.folder-context-menu {
+			position: fixed; z-index: 10000;
+			background-color: #1e1f20;
+			border: 1px solid #444746;
+			border-radius: 4px;
+			padding: 8px 0;
+			box-shadow: 0px 3px 1px -2px rgba(0,0,0,0.2),0px 2px 2px 0px rgba(0,0,0,0.14),0px 1px 5px 0px rgba(0,0,0,0.12);
+			display: none;
+			min-width: 160px;
+		}
+		.folder-context-menu-item {
+			padding: 8px 12px; cursor: pointer; white-space: nowrap;
+			font-family: "Google Sans Flex","Google Sans Text","Google Sans",sans-serif;
+			font-size: 0.875rem; font-weight: 500; line-height: 1.25rem;
+			color: #e3e3e3;
+		}
+		.folder-context-menu-item:hover { background-color: rgba(227, 227, 227, 0.08); }
+		.folder-context-menu-item.delete { color: #f2b8b5; }
+		.folder-context-menu-item.delete:hover { background-color: rgba(242, 184, 181, 0.08); }
+
+		.sortable-ghost { opacity: 0.4; }
+		.item-group.sortable-ghost { background-color: #555 !important; }
 
 		/* --- Dialog & Color Picker Styles --- */
 		.custom-dialog-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(34, 34, 34, 0.75); z-index: 1000000; display: flex; align-items: center; justify-content: center; }
-		.custom-dialog-box { background-color: #333333; padding: 25px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); text-align: center; max-width: 400px; border: 1px solid var(--surface-4); }
+		.custom-dialog-box { background-color: #333333; padding: 25px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); text-align: center; max-width: 400px; border: 1px solid #444; }
 		.custom-dialog-box p, .custom-dialog-box h2 { margin: 0 0 20px; font-family: 'Roboto', Arial, sans-serif; color: #FFFFFF; }
 		.custom-dialog-btn { border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; font-weight: 500; margin: 0 10px; }
 		.dialog-btn-confirm { background-color: #8ab4f8; color: #202124; }
-		.dialog-btn-cancel { background-color: var(--surface-4); color: var(--on-surface); }
-		.custom-dialog-input { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 8px; border: 1px solid var(--surface-4); background-color: var(--surface-1); color: var(--on-surface); font-size: 16px; margin-bottom: 20px; }
+		.dialog-btn-cancel { background-color: #444; color: #fff; }
+		.dialog-btn-delete { background-color: #5c2b2b !important; color: white !important; }
+		.dialog-btn-delete:hover { background-color: #7d3a3a !important; }
+		.custom-dialog-input { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 8px; border: 1px solid #5f6368; background-color: #202122; color: #e3e3e3; font-size: 16px; margin-bottom: 20px; }
 		.color-picker-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
 		.color-picker-dialog .color-swatch { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; position: relative; }
-		.color-picker-dialog .color-swatch:hover { border: 2px solid var(--on-primary-surface); }
+		.color-picker-dialog .color-swatch:hover { border: 2px solid #8ab4f8; }
 		.color-picker-dialog .color-swatch.selected::after { content: ""; position: absolute; inset: 0; border: 3px solid #fff; border-radius: 50%; box-sizing: border-box; pointer-events: none; }
 	`;
 
@@ -401,76 +492,6 @@ module.exports = Ferdium => {
 		localStorage.setItem(STORAGE_KEY_CONVO_FOLDERS, JSON.stringify(conversationFolders));
 	}
 
-	// --- Toolbar Creation ---
-
-	function createToolbar() {
-		const toolbarId = 'gemini-snippet-toolbar-ferdium';
-		let toolbar = document.getElementById(toolbarId);
-		if (toolbar) {
-			clearElement(toolbar);
-		} else {
-			toolbar = document.createElement('div');
-			toolbar.id = toolbarId;
-			document.body.insertBefore(toolbar, document.body.firstChild);
-		}
-
-		toolbarItems.forEach(item => {
-			if (item.visible === false) return;
-
-			if (item.type === 'button') {
-				const button = document.createElement('button');
-				button.textContent = item.label;
-				button.title = item.text;
-				button.addEventListener('click', () => insertSnippetText(item.text));
-				toolbar.appendChild(button);
-			} else if (item.type === 'dropdown') {
-				const select = document.createElement('select');
-				select.title = item.placeholder;
-				const defaultOption = new Option(item.placeholder, "", true, true);
-				defaultOption.disabled = true;
-				select.appendChild(defaultOption);
-				item.options.forEach(opt => select.appendChild(new Option(opt.label, opt.text)));
-				select.addEventListener('change', (e) => {
-					if (e.target.value) {
-						insertSnippetText(e.target.value);
-						e.target.selectedIndex = 0;
-					}
-				});
-				toolbar.appendChild(select);
-			} else if (item.type === 'action') {
-				const button = document.createElement('button');
-				button.textContent = item.label;
-				button.title = item.title;
-				if (item.action === 'paste') {
-					button.addEventListener('click', async () => {
-						try {
-							const text = await navigator.clipboard.readText();
-							if (text) insertSnippetText(text);
-						} catch (err) {
-							displayUserscriptMessage('Failed to read clipboard: ' + err.message);
-						}
-					});
-				} else if (item.action === 'download') {
-					button.addEventListener('click', handleGlobalCanvasDownload);
-				} else if (item.action === 'pdf') {
-					button.addEventListener('click', handlePDFExport);
-				} else if (item.action === 'copy') {
-					button.addEventListener('click', handleCopy);
-				}
-				toolbar.appendChild(button);
-			}
-		});
-
-		const spacer = document.createElement('div');
-		spacer.className = 'userscript-toolbar-spacer';
-		toolbar.appendChild(spacer);
-
-		const settingsButton = document.createElement('button');
-		settingsButton.textContent = SETTINGS_BUTTON_LABEL;
-		settingsButton.title = "Open Settings";
-		settingsButton.addEventListener('click', () => toggleSettingsPanel());
-		toolbar.appendChild(settingsButton);
-	}
 
 	function rebuildToolbar() {
 		const toolbar = document.getElementById('gemini-snippet-toolbar-ferdium');
@@ -479,196 +500,329 @@ module.exports = Ferdium => {
 
 	// --- Folder UI and Logic ---
 
-	function getIdentifierFromElement(el) {
+	function getAngularScope(selector) {
+		const el = document.querySelector(selector);
 		if (!el) return null;
-		if (el.matches && el.matches(FOLDER_CHAT_CONTAINER_SELECTOR)) {
-			el = el.querySelector(FOLDER_CHAT_ITEM_SELECTOR) || el;
+		for (let attr of el.attributes) {
+			if (attr.name.startsWith('_ngcontent-')) return attr.name;
 		}
-		const anchor = (el.tagName === 'A' ? el : null) || el.querySelector('a') || el.closest('a');
-		if (anchor) {
-			const href = anchor.getAttribute('href') || anchor.href || '';
-			const m = href.match(/\/(?:app|conversation)\/([A-Za-z0-9_-]+)/);
-			if (m) return m[1];
+		return null;
+	}
+
+	function initializeFolders() {
+		const foldersContainerId = 'folder-ui-container';
+		if (document.getElementById(foldersContainerId)) return true;
+
+		// Find insertion target: chat header or conversations list / section
+		let recentHeader = document.querySelector('#sidenav-section-header-chats, [aria-controls="sidenav-section-content-chats"]');
+		if (!recentHeader) {
+			const headers = document.querySelectorAll('button.expandable-section-header, div.expandable-section-header, .expandable-section-header');
+			if (headers.length >= 2) {
+				recentHeader = headers[1];
+			} else if (headers.length === 1) {
+				recentHeader = headers[0];
+			}
 		}
-		const jslog = (el.getAttribute && el.getAttribute('jslog')) || '';
-		let m = jslog.match(/"c_([A-Za-z0-9_-]+)"/);
-		if (!m) m = jslog.match(/c_([A-Za-z0-9_-]+)/);
+
+		if (!recentHeader) {
+			const fallbackList = document.querySelector('conversations-list, #sidenav-section-content-chats, mat-nav-list, gem-nav-list, .conversations-list');
+			if (!fallbackList) return false;
+			recentHeader = fallbackList;
+		}
+
+		const container = document.createElement('div');
+		container.setAttribute('storagekey', 'folders-mod');
+		container.id = foldersContainerId;
+		recentHeader.parentNode.insertBefore(container, recentHeader);
+		renderFolders();
+
+		const chatHistoryList = document.querySelector('conversations-list, #sidenav-section-content-chats, mat-nav-list, gem-nav-list, .conversations-list');
+		if (chatHistoryList) {
+			let debounceTimer = null;
+			const observer = new MutationObserver(() => {
+				clearTimeout(debounceTimer);
+				debounceTimer = setTimeout(() => {
+					processConversationItems(chatHistoryList);
+				}, 100);
+			});
+			observer.observe(chatHistoryList, { childList: true, subtree: true });
+			processConversationItems(chatHistoryList);
+		}
+		return true;
+	}
+
+	function renderFolders() {
+		const container = document.getElementById('folder-ui-container');
+		if (!container) return;
+
+		const headerScope = getAngularScope('.expandable-section-title') || '';
+		const itemScope = getAngularScope('gem-nav-list-item, .gem-nav-list-item') || getAngularScope('.title-text') || '';
+
+		const STORAGE_KEY_SECTION_OPEN = 'ferdium_gemini_folder_section_open';
+		const isSectionOpen = localStorage.getItem(STORAGE_KEY_SECTION_OPEN) !== 'false';
+
+		if (isSectionOpen) container.classList.add('expanded');
+
+		let oldHeader = document.getElementById('folder-section-header');
+		if (oldHeader) oldHeader.remove();
+
+		const sectionHeader = document.createElement('button');
+		sectionHeader.id = 'folder-section-header';
+		sectionHeader.setAttribute('data-test-id', 'expandable-section-toggle');
+		sectionHeader.setAttribute('aria-expanded', isSectionOpen ? 'true' : 'false');
+		sectionHeader.className = 'expandable-section-header ' + (isSectionOpen ? '' : 'collapsed');
+		if (headerScope) sectionHeader.setAttribute(headerScope, '');
+
+		const sectionLabel = document.createElement('span');
+		sectionLabel.className = 'expandable-section-title gds-body-s folder-section-label';
+		sectionLabel.textContent = 'Folders';
+		if (headerScope) sectionLabel.setAttribute(headerScope, '');
+
+		const sectionChevron = document.createElement('gem-icon');
+		sectionChevron.className = 'toggle-icon';
+		sectionChevron.setAttribute('data-test-id', 'expandable-section-toggle-icon');
+		if (headerScope) sectionChevron.setAttribute(headerScope, '');
+
+		const chevronIcon = document.createElement('mat-icon');
+		chevronIcon.className = 'mat-icon notranslate lm-icon-s lumi-symbols mat-ligature-font mat-icon-no-color';
+		chevronIcon.setAttribute('role', 'img');
+		chevronIcon.setAttribute('aria-hidden', 'true');
+		chevronIcon.textContent = isSectionOpen ? 'keyboard_arrow_down' : 'keyboard_arrow_right';
+		sectionChevron.appendChild(chevronIcon);
+
+		sectionHeader.appendChild(sectionLabel);
+		sectionHeader.appendChild(sectionChevron);
+		container.appendChild(sectionHeader);
+
+		let folderWrapper = document.getElementById('folder-section-body');
+		if (folderWrapper) {
+			const mainList = document.querySelector(FOLDER_CHAT_LIST_CONTAINER_SELECTOR);
+			if (mainList) {
+				folderWrapper.querySelectorAll(FOLDER_CHAT_ITEM_SELECTOR).forEach(item => {
+					mainList.appendChild(item);
+				});
+			}
+			folderWrapper.remove();
+		}
+
+		folderWrapper = document.createElement('div');
+		folderWrapper.id = 'folder-section-body';
+		folderWrapper.style.display = 'block';
+		folderWrapper.style.width = '100%';
+		folderWrapper.style.overflow = 'hidden';
+		folderWrapper.style.transition = 'max-height 0.25s ease-in-out';
+		folderWrapper.style.maxHeight = isSectionOpen ? '2000px' : '0px';
+		container.appendChild(folderWrapper);
+
+		sectionHeader.addEventListener('click', () => {
+			const nowCollapsed = sectionHeader.classList.toggle('collapsed');
+			sectionHeader.setAttribute('aria-expanded', nowCollapsed ? 'false' : 'true');
+			folderWrapper.style.maxHeight = nowCollapsed ? '0px' : '2000px';
+			const newChevron = nowCollapsed ? 'keyboard_arrow_right' : 'keyboard_arrow_down';
+			chevronIcon.textContent = newChevron;
+			localStorage.setItem(STORAGE_KEY_SECTION_OPEN, (!nowCollapsed).toString());
+		});
+
+		folders.forEach(folder => {
+			folderWrapper.appendChild(createFolderElement(folder, itemScope));
+		});
+
+		const addBtn = document.createElement('button');
+		addBtn.id = 'add-folder-btn';
+
+		const addIcon = document.createElement('mat-icon');
+		addIcon.className = 'mat-icon notranslate lm-icon-s lumi-symbols mat-ligature-font mat-icon-no-color add-folder-icon';
+		addIcon.textContent = 'add';
+		addIcon.style.color = 'var(--lumi-sys-color--on-surface-variant, #c4c7c5)';
+
+		const addBtnLabel = document.createElement('span');
+		addBtnLabel.className = 'title-text gds-body-s add-folder-label';
+		addBtnLabel.textContent = 'New Folder';
+		if (itemScope) addBtnLabel.setAttribute(itemScope, '');
+
+		addBtn.appendChild(addIcon);
+		addBtn.appendChild(addBtnLabel);
+		addBtn.addEventListener('click', () => {
+			showCustomPromptDialog("New Folder Name:", "", "Create", (name) => {
+				if (name) {
+					folders.push({ id: Date.now().toString(), name: name, color: FOLDER_COLORS[0], isOpen: true });
+					saveFolderConfiguration();
+					renderFolders();
+				}
+			});
+		});
+		folderWrapper.appendChild(addBtn);
+
+		if (Sortable) {
+			new Sortable(folderWrapper, {
+				animation: 150,
+				handle: '.folder-header',
+				onEnd: () => {
+					const newOrder = [];
+					folderWrapper.querySelectorAll('.folder').forEach(el => {
+						const id = el.dataset.id;
+						const folder = folders.find(f => f.id === id);
+						if (folder) newOrder.push(folder);
+					});
+					folders = newOrder;
+					saveFolderConfiguration();
+				}
+			});
+		}
+
+		const chatListEl = document.querySelector(FOLDER_INJECTION_POINT_SELECTOR);
+		if (chatListEl) {
+			processConversationItems(chatListEl);
+		}
+	}
+
+	function createFolderElement(folder, itemScope) {
+		const isOpen = folder.isOpen !== undefined ? folder.isOpen : !folder.isClosed;
+		const folderDiv = document.createElement('div');
+		folderDiv.className = `folder ${isOpen ? '' : 'closed'}`;
+		folderDiv.dataset.id = folder.id;
+
+		const header = document.createElement('div');
+		header.className = 'folder-header';
+
+		const iconWrapper = document.createElement('div');
+		iconWrapper.className = 'folder-icon-wrapper';
+
+		const matIcon = document.createElement('mat-icon');
+		matIcon.className = 'mat-icon notranslate lm-icon-s lumi-symbols mat-ligature-font mat-icon-no-color folder-icon';
+		matIcon.textContent = isOpen ? 'folder_open' : 'folder';
+		matIcon.style.color = folder.color || '#808080';
+		iconWrapper.appendChild(matIcon);
+		header.appendChild(iconWrapper);
+
+		const nameSpan = document.createElement('span');
+		nameSpan.className = 'title-text gds-body-s folder-name';
+		nameSpan.textContent = folder.name;
+		if (itemScope) nameSpan.setAttribute(itemScope, '');
+		header.appendChild(nameSpan);
+
+		const controls = document.createElement('div');
+		controls.className = 'folder-controls';
+
+		const settingsBtn = document.createElement('button');
+		settingsBtn.className = 'folder-options-btn';
+		settingsBtn.textContent = '⋮';
+		settingsBtn.title = "Folder Options";
+		settingsBtn.addEventListener('click', (e) => {
+			e.stopPropagation();
+			showFolderContextMenu(e, folder);
+		});
+		controls.appendChild(settingsBtn);
+
+		const toggleIcon = document.createElement('span');
+		toggleIcon.className = 'folder-toggle-icon';
+		toggleIcon.textContent = '▼';
+		controls.appendChild(toggleIcon);
+
+		header.appendChild(controls);
+
+		header.addEventListener('click', () => {
+			const currentlyOpen = folder.isOpen !== undefined ? folder.isOpen : !folder.isClosed;
+			folder.isOpen = !currentlyOpen;
+			folder.isClosed = !folder.isOpen;
+			folderDiv.classList.toggle('closed', !folder.isOpen);
+			matIcon.textContent = folder.isOpen ? 'folder_open' : 'folder';
+			saveFolderConfiguration();
+		});
+
+		folderDiv.appendChild(header);
+
+		const contentDiv = document.createElement('div');
+		contentDiv.className = 'folder-content';
+		contentDiv.dataset.folderId = folder.id;
+
+		folderDiv.appendChild(contentDiv);
+
+		if (Sortable) {
+			new Sortable(contentDiv, {
+				group: 'conversations',
+				animation: 150,
+				onAdd: (evt) => {
+					const item = evt.item;
+					const convoId = getConversationId(item);
+					if (convoId) {
+						conversationFolders[convoId] = folder.id;
+						saveFolderConfiguration();
+					}
+				}
+			});
+		}
+
+		return folderDiv;
+	}
+
+	function getConversationId(element) {
+		if (!element) return null;
+		const link = (element.tagName === 'A' ? element : null) || element.querySelector('a') || element.closest('a');
+		if (link) {
+			const href = link.getAttribute('href') || link.href || '';
+			const match = href.match(/\/(?:app|conversation)\/([a-zA-Z0-9_-]+)/);
+			if (match) return match[1];
+		}
+		const jslog = (element.getAttribute && element.getAttribute('jslog')) || '';
+		let m = jslog.match(/"c_([A-Za-z0-9_-]+)"/) || jslog.match(/c_([A-Za-z0-9_-]+)/);
 		if (m) return m[1];
-		const t = el.querySelector('.conversation-title, [data-test-id="conversation-title"]') || anchor?.querySelector('span span span span');
+		const t = element.querySelector('.conversation-title, [data-test-id="conversation-title"]') || link?.querySelector('span span span span');
 		if (t && t.textContent.trim()) return `title:${t.textContent.trim()}`;
 		return null;
 	}
 
-	function renderFolders() {
-		const container = document.getElementById('folder-container');
-		if (!container) return;
+	function showFolderContextMenu(e, folder) {
+		const existingMenu = document.getElementById('folder-context-menu');
+		if (existingMenu) existingMenu.remove();
 
-		const chatListContainer = document.querySelector(FOLDER_CHAT_LIST_CONTAINER_SELECTOR);
-		if (chatListContainer) {
-			container.querySelectorAll('.folder-content > *').forEach(item => {
-				chatListContainer.appendChild(item);
-			});
-		}
+		const menu = document.createElement('div');
+		menu.id = 'folder-context-menu';
+		menu.className = 'folder-context-menu';
 
-		clearElement(container);
-
-		folders.forEach(folder => {
-			const folderEl = document.createElement('div');
-			folderEl.className = 'folder';
-			folderEl.dataset.folderId = folder.id;
-			if (folder.isClosed) folderEl.classList.add('closed');
-
-			const headerEl = document.createElement('div');
-			headerEl.className = 'folder-header';
-			headerEl.addEventListener('click', (e) => {
-				if (!e.target.closest('.folder-options-btn')) toggleFolder(folder.id);
-			});
-			// Auto-open on drag over
-			headerEl.addEventListener('dragenter', () => {
-				if (folder.isClosed) toggleFolder(folder.id);
-			});
-
-			// Icon Wrapper
-			const iconWrapper = document.createElement('div');
-			iconWrapper.className = 'folder-icon-wrapper';
-
-			// SVG for Closed Folder
-			const iconClosed = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-			iconClosed.setAttribute("viewBox", "0 0 24 24");
-			iconClosed.setAttribute("class", "folder-icon icon-closed");
-			const pathClosed = document.createElementNS("http://www.w3.org/2000/svg", "path");
-			pathClosed.setAttribute("d", "M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z");
-			pathClosed.setAttribute("fill", folder.color);
-			iconClosed.appendChild(pathClosed);
-
-			// SVG for Open Folder
-			const iconOpen = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-			iconOpen.setAttribute("viewBox", "0 0 24 24");
-			iconOpen.setAttribute("class", "folder-icon icon-open");
-			const pathOpen = document.createElementNS("http://www.w3.org/2000/svg", "path");
-			pathOpen.setAttribute("d", "M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z");
-			pathOpen.setAttribute("fill", folder.color);
-			iconOpen.appendChild(pathOpen);
-
-			iconWrapper.appendChild(iconClosed);
-			iconWrapper.appendChild(iconOpen);
-
-			const nameEl = document.createElement('span');
-			nameEl.className = 'folder-name';
-			nameEl.textContent = folder.name;
-
-			const controlsEl = document.createElement('div');
-			controlsEl.className = 'folder-controls';
-
-			const toggleIcon = document.createElement('span');
-			toggleIcon.className = 'folder-toggle-icon';
-			toggleIcon.textContent = '▼';
-
-			const optionsBtn = document.createElement('button');
-			optionsBtn.className = 'folder-options-btn';
-			optionsBtn.textContent = '⋮';
-			optionsBtn.addEventListener('click', (e) => showContextMenu(e, folder.id));
-
-			controlsEl.appendChild(toggleIcon);
-			controlsEl.appendChild(optionsBtn);
-
-			headerEl.appendChild(iconWrapper);
-			headerEl.appendChild(nameEl);
-			headerEl.appendChild(controlsEl);
-
-			const contentEl = document.createElement('div');
-			contentEl.className = 'folder-content';
-
-			folderEl.appendChild(headerEl);
-			folderEl.appendChild(contentEl);
-			container.appendChild(folderEl);
-		});
-
-		organizeConversations();
-		setupDragAndDrop();
-	}
-
-	function organizeConversations() {
-		const chatListContainer = document.querySelector(FOLDER_CHAT_LIST_CONTAINER_SELECTOR);
-		if (!chatListContainer) return;
-
-		const folderIds = new Set(folders.map(f => f.id));
-		let dataWasCorrected = false;
-
-		document.querySelectorAll('.folder-content').forEach(fc => {
-			Array.from(fc.children).forEach(item => {
-				const convoEl = (item.matches && item.matches(FOLDER_CHAT_ITEM_SELECTOR))
-					? item
-					: (item.querySelector(FOLDER_CHAT_ITEM_SELECTOR) || item);
-				const identifier = getIdentifierFromElement(convoEl);
-				if (!identifier || !conversationFolders[identifier] || !folderIds.has(conversationFolders[identifier])) {
-					chatListContainer.appendChild(item);
-				}
-			});
-		});
-
-		Array.from(chatListContainer.children).forEach(itemToMove => {
-			const convoEl = (itemToMove.matches && itemToMove.matches(FOLDER_CHAT_ITEM_SELECTOR))
-				? itemToMove
-				: (itemToMove.querySelector(FOLDER_CHAT_ITEM_SELECTOR) || itemToMove);
-			const identifier = getIdentifierFromElement(convoEl);
-			if (!identifier) return;
-
-			let folderId = conversationFolders[identifier];
-
-			if (folderId && !folderIds.has(folderId)) {
-				delete conversationFolders[identifier];
-				folderId = null;
-				dataWasCorrected = true;
-			}
-
-			if (folderId) {
-				const folderContent = document.querySelector(`.folder[data-folder-id="${folderId}"] .folder-content`);
-				if (folderContent && !folderContent.contains(itemToMove)) {
-					itemToMove.classList.add('conversation-items-container');
-					folderContent.appendChild(itemToMove);
-				}
-			}
-		});
-
-		if (dataWasCorrected) {
-			saveFolderConfiguration();
-		}
-	}
-
-
-	function createNewFolder() {
-		showCustomPromptDialog("Enter New Folder Name", "", "Create", (name) => {
-			if (name) {
-				const newFolder = { id: `folder_${Date.now()}`, name, color: '#808080', isClosed: false };
-				folders.push(newFolder);
-				saveFolderConfiguration();
-				renderFolders();
-			}
-		});
-	}
-
-	function updateFolderHeader(folderId) {
-		const folder = folders.find(f => f.id === folderId);
-		const folderEl = document.querySelector(`.folder[data-folder-id="${folderId}"]`);
-		if (!folder || !folderEl) return;
-		folderEl.querySelector('.folder-name').textContent = folder.name;
-		// Update icon colors
-		folderEl.querySelectorAll('.folder-icon path').forEach(path => {
-			path.setAttribute('fill', folder.color);
-		});
-	}
-
-	function renameFolder(folderId) {
-		const folder = folders.find(f => f.id === folderId);
-		if (!folder) return;
-		showCustomPromptDialog("Rename Folder", folder.name, "Save", (newName) => {
-			if (newName && newName !== folder.name) {
+		const renameItem = document.createElement('div');
+		renameItem.className = 'folder-context-menu-item';
+		renameItem.textContent = '✏️ Rename';
+		renameItem.onclick = () => {
+			showCustomPromptDialog("Rename Folder:", folder.name, "Save", (newName) => {
 				folder.name = newName;
 				saveFolderConfiguration();
-				updateFolderHeader(folderId);
-			}
-		});
+				renderFolders();
+			});
+			menu.remove();
+		};
+		menu.appendChild(renameItem);
+
+		const colorItem = document.createElement('div');
+		colorItem.className = 'folder-context-menu-item';
+		colorItem.textContent = '🎨 Change Color';
+		colorItem.onclick = () => {
+			showColorPickerDialog(folder.id);
+			menu.remove();
+		};
+		menu.appendChild(colorItem);
+
+		const deleteItem = document.createElement('div');
+		deleteItem.className = 'folder-context-menu-item delete';
+		deleteItem.textContent = '🗑️ Delete';
+		deleteItem.onclick = () => {
+			showConfirmationDialog(`Delete folder "${folder.name}"? Conversations will return to the main list.`, () => {
+				deleteFolder(folder.id);
+			}, "Delete", "dialog-btn-delete");
+			menu.remove();
+		};
+		menu.appendChild(deleteItem);
+
+		document.body.appendChild(menu);
+		menu.style.display = 'block';
+		menu.style.left = e.pageX + 'px';
+		menu.style.top = e.pageY + 'px';
+
+		const closeMenu = () => {
+			menu.remove();
+			document.removeEventListener('click', closeMenu);
+		};
+		setTimeout(() => document.addEventListener('click', closeMenu), 0);
 	}
 
 	function deleteFolder(folderId) {
@@ -678,124 +832,70 @@ module.exports = Ferdium => {
 		folders = folders.filter(f => f.id !== folderId);
 		saveFolderConfiguration();
 		renderFolders();
-	}
-
-	function toggleFolder(folderId) {
-		const folder = folders.find(f => f.id === folderId);
-		if (folder) {
-			folder.isClosed = !folder.isClosed;
-			const folderEl = document.querySelector(`.folder[data-folder-id="${folderId}"]`);
-			if (folderEl) folderEl.classList.toggle('closed');
-			saveFolderConfiguration();
+		const chatListEl = document.querySelector(FOLDER_INJECTION_POINT_SELECTOR);
+		if (chatListEl) {
+			processConversationItems(chatListEl);
 		}
 	}
 
-	function initializeFolders() {
-		if (document.getElementById('folder-ui-container')) {
-			organizeConversations();
-			return true;
-		}
+	function processConversationItems(chatHistoryList) {
+		if (!chatHistoryList) return;
 
-		let targetNode = null;
-		let insertBefore = false;
+		const mainList = (chatHistoryList.matches && chatHistoryList.matches(FOLDER_CHAT_LIST_CONTAINER_SELECTOR))
+			? chatHistoryList
+			: (chatHistoryList.querySelector(FOLDER_CHAT_LIST_CONTAINER_SELECTOR) || chatHistoryList);
 
-		const convosList = document.querySelector('conversations-list, div.chat-history-list, .conversations-list');
-		const chatsSection = document.querySelector('#sidenav-section-content-chats');
-		const headers = document.querySelectorAll('button.expandable-section-header, div.expandable-section-header, .expandable-section-header, #sidenav-section-header-chats, [aria-controls="sidenav-section-content-chats"]');
+		const folderUiContainer = document.getElementById('folder-ui-container') || document.getElementById('folder-section-body') || document.getElementById('folder-container');
 
-		if (convosList) {
-			targetNode = convosList;
-			insertBefore = true;
-		} else if (chatsSection) {
-			targetNode = chatsSection;
-			insertBefore = false;
-		} else if (headers.length > 0) {
-			targetNode = headers.length >= 2 ? headers[1] : headers[0];
-			insertBefore = true;
-		}
+		const items = Array.from(document.querySelectorAll(FOLDER_CHAT_ITEM_SELECTOR)).filter(el => {
+			return listContains(chatHistoryList, el) || listContains(mainList, el) || listContains(folderUiContainer, el);
+		});
 
-		if (!targetNode) return false;
+		items.forEach(item => {
+			if (!item.parentNode?.classList?.contains('conversation-items-container')) {
+				item.classList.add('conversation-items-container');
+			}
 
-		const uiContainer = document.createElement('div');
-		uiContainer.id = 'folder-ui-container';
-		const addButton = document.createElement('button');
-		addButton.id = 'add-folder-btn';
-		addButton.textContent = '＋ New Folder';
-		addButton.onclick = createNewFolder;
-		const folderContainer = document.createElement('div');
-		folderContainer.id = 'folder-container';
-		uiContainer.appendChild(addButton);
-		uiContainer.appendChild(folderContainer);
+			const convoId = getConversationId(item);
+			if (!convoId) return;
 
-		if (insertBefore && targetNode.parentNode) {
-			targetNode.parentNode.insertBefore(uiContainer, targetNode);
-		} else {
-			targetNode.prepend(uiContainer);
-		}
+			const assignedFolderId = conversationFolders[convoId];
 
-		renderFolders();
+			if (assignedFolderId) {
+				const folderContent = document.querySelector(`.folder-content[data-folder-id="${assignedFolderId}"]`);
+				if (folderContent && !folderContent.contains(item)) {
+					folderContent.appendChild(item);
+				}
+			} else {
+				if (mainList && !mainList.contains(item)) {
+					mainList.appendChild(item);
+				}
+			}
+		});
 
-		// Attach MutationObserver to observe conversation list additions
-		const chatList = document.querySelector(FOLDER_CHAT_LIST_CONTAINER_SELECTOR) || targetNode;
-		if (chatList && !chatList.dataset.geminiModObserved) {
-			chatList.dataset.geminiModObserved = 'true';
-			let debounceTimer = null;
-			const observer = new MutationObserver(() => {
-				clearTimeout(debounceTimer);
-				debounceTimer = setTimeout(() => {
-					organizeConversations();
-					setupDragAndDrop();
-				}, 150);
+		if (mainList && Sortable && (!mainList.classList.contains('gemini-mod-sortable-init') || !Sortable.get(mainList))) {
+			mainList.classList.add('gemini-mod-sortable-init');
+			const existingSortable = Sortable.get(mainList);
+			if (existingSortable) {
+				try { existingSortable.destroy(); } catch (e) { }
+			}
+			new Sortable(mainList, {
+				group: 'conversations',
+				animation: 150,
+				onAdd: (evt) => {
+					const item = evt.item;
+					const convoId = getConversationId(item);
+					if (convoId && conversationFolders[convoId]) {
+						delete conversationFolders[convoId];
+						saveFolderConfiguration();
+					}
+				}
 			});
-			observer.observe(chatList, { childList: true, subtree: true });
 		}
-
-		return true;
 	}
 
-	// --- Context Menus & Dialogs ---
-
-	function showContextMenu(event, folderId) {
-		event.preventDefault();
-		event.stopPropagation();
-		closeContextMenu();
-
-		const btn = event.currentTarget;
-		const rect = btn.getBoundingClientRect();
-
-		const menu = document.createElement('div');
-		menu.className = 'folder-context-menu';
-		menu.id = 'folder-context-menu-active';
-
-		const items = {
-			'Rename': () => renameFolder(folderId),
-			'Change Color': () => showColorPickerDialog(folderId),
-			'Delete Folder': () => showConfirmationDialog("Are you sure you want to delete this folder?", () => deleteFolder(folderId), "Delete", "dialog-btn-delete")
-		};
-
-		for (const [text, action] of Object.entries(items)) {
-			const itemEl = document.createElement('div');
-			itemEl.className = 'folder-context-menu-item';
-			if (text === 'Delete Folder') itemEl.classList.add('delete');
-			itemEl.textContent = text;
-			itemEl.onclick = (e) => {
-				e.stopPropagation();
-				closeContextMenu();
-				action(e);
-			};
-			menu.appendChild(itemEl);
-		}
-
-		document.body.appendChild(menu);
-		menu.style.display = 'block';
-		menu.style.top = `${rect.bottom + window.scrollY}px`;
-		menu.style.left = `${rect.right + window.scrollX - menu.offsetWidth}px`;
-		setTimeout(() => document.addEventListener('click', closeContextMenu, { once: true }), 0);
-	}
-
-	function closeContextMenu() {
-		const menu = document.getElementById('folder-context-menu-active');
-		if (menu) menu.remove();
+	function listContains(list, node) {
+		return list && list.contains(node);
 	}
 
 	function showColorPickerDialog(folderId) {
@@ -869,7 +969,7 @@ module.exports = Ferdium => {
 			if (/^#[0-9A-F]{6}$/i.test(newColor) || /^#([0-9A-F]{3}){1,2}$/i.test(newColor)) {
 				folder.color = newColor;
 				saveFolderConfiguration();
-				updateFolderHeader(folderId);
+				renderFolders();
 				overlay.remove();
 			} else {
 				hexInput.style.border = "1px solid red";
@@ -940,102 +1040,6 @@ module.exports = Ferdium => {
 		input.onkeydown = (e) => { if (e.key === 'Enter') btnYes.click(); };
 	}
 
-	// --- Drag and Drop (Sortable.js) ---
-	function setupDragAndDrop() {
-		// Note: Sortable is loaded in the Main World (bridge), so we dispatch events to initialize it.
-		console.log("Gemini Mod: Requesting Sortable initialization via Bridge.");
-
-		// 1. Folder Container (Main Folders)
-		document.dispatchEvent(new CustomEvent('GEMINI_INIT_SORTABLE', {
-			detail: {
-				selector: '#folder-container',
-				options: { animation: 150 }
-			}
-		}));
-
-		// 2. Chat List Container (Conversations inside Folders)
-		document.dispatchEvent(new CustomEvent('GEMINI_INIT_SORTABLE', {
-			detail: {
-				selector: FOLDER_CHAT_LIST_CONTAINER_SELECTOR,
-				options: { group: 'shared', animation: 150 }
-			}
-		}));
-
-		// 3. Folder Contents (Conversations dragging between folders)
-		document.querySelectorAll('.folder-content').forEach((folderContentEl, index) => {
-			if (!folderContentEl.id) {
-				const folderId = folderContentEl.closest('.folder')?.dataset.folderId || 'unknown';
-				folderContentEl.id = `folder-content-${folderId}-${index}`;
-			}
-
-			document.dispatchEvent(new CustomEvent('GEMINI_INIT_SORTABLE', {
-				detail: {
-					selector: '#' + folderContentEl.id,
-					options: { group: 'shared', animation: 150 }
-				}
-			}));
-		});
-
-		// 4. Settings Toolbar
-		document.dispatchEvent(new CustomEvent('GEMINI_INIT_SORTABLE', {
-			detail: {
-				selector: '#toolbar-items-container',
-				options: { animation: 150, ghostClass: 'sortable-ghost' }
-			}
-		}));
-	}
-
-	// Global Listener for Sort Updates
-	// Global Listener for Sort Updates
-	document.addEventListener('GEMINI_SORT_UPDATE', (e) => {
-		if (e.detail && e.detail.newOrder) {
-			const { newOrder, container } = e.detail;
-			console.log("Gemini Mod: Sort Update received via Bridge for", container);
-
-			if (container === '#folder-container') {
-				// Reorder main folders
-				const newFolders = [];
-				newOrder.forEach(id => {
-					const folder = folders.find(f => f.id === id);
-					if (folder) newFolders.push(folder);
-				});
-				// Add missed
-				folders.forEach(f => {
-					if (!newFolders.find(nf => nf.id === f.id)) newFolders.push(f);
-				});
-				folders = newFolders;
-				saveFolderConfiguration();
-			} else {
-				// Assume it's a conversation list (either main list or folder content)
-				// Always rebuild state to catch items moving between containers
-				rebuildAndSaveState();
-			}
-		}
-	});
-
-	function rebuildAndSaveState() {
-		const newConversationFolders = {};
-		let count = 0;
-		document.querySelectorAll('.folder').forEach(folderEl => {
-			const folderId = folderEl.dataset.folderId;
-			const folderContent = folderEl.querySelector('.folder-content');
-			if (folderContent) {
-				Array.from(folderContent.children).forEach(item => {
-					const convoEl = (item.matches && item.matches(FOLDER_CHAT_ITEM_SELECTOR))
-						? item
-						: (item.querySelector(FOLDER_CHAT_ITEM_SELECTOR) || item);
-					const id = getIdentifierFromElement(convoEl);
-					if (id) {
-						newConversationFolders[id] = folderId;
-						count++;
-					}
-				});
-			}
-		});
-		console.log(`Gemini Mod: Rebuilt state. Found ${count} conversations in folders.`);
-		conversationFolders = newConversationFolders;
-		saveFolderConfiguration();
-	}
 
 
 
@@ -1483,7 +1487,15 @@ module.exports = Ferdium => {
 
 		if (show) {
 			populateSettingsPanel();
-			setupDragAndDrop(); // Re-bind D&D
+			const itemsContainer = document.getElementById('toolbar-items-container');
+			if (itemsContainer && Sortable && (!itemsContainer.classList.contains('gemini-mod-sortable-init') || !Sortable.get(itemsContainer))) {
+				itemsContainer.classList.add('gemini-mod-sortable-init');
+				new Sortable(itemsContainer, {
+					animation: 150,
+					handle: '.item-group',
+					ghostClass: 'sortable-ghost'
+				});
+			}
 			overlay.style.display = 'block';
 		} else {
 			overlay.style.display = 'none';
@@ -1521,7 +1533,7 @@ module.exports = Ferdium => {
 			'https://accounts.google.com/AccountChooser?continue=https://gemini.google.com/u/0/';
 	}
 
-	window.addEventListener('load', () => {
+	function init() {
 		try {
 			console.log("Ferdium Gemini Mod: Initializing...");
 
@@ -1552,7 +1564,7 @@ module.exports = Ferdium => {
 							clearInterval(folderInitInterval);
 							console.log("Ferdium Gemini Mod: Folders Initialized.");
 						}
-						if (attempts > 20) { // Stop after 10 seconds (20 * 500ms)
+						if (attempts > 60) { // Stop after 30 seconds (60 * 500ms)
 							clearInterval(folderInitInterval);
 							console.warn("Ferdium Gemini Mod: Folder initialization timed out.");
 						}
@@ -1566,10 +1578,16 @@ module.exports = Ferdium => {
 			}, 1000);
 
 		} catch (err) {
-			console.error("Gemini Mod: Fatal error in load handler:", err);
+			console.error("Gemini Mod: Fatal error in init handler:", err);
 			if (Ferdium && Ferdium.displayErrorMessage) {
 				Ferdium.displayErrorMessage("Gemini Mod Failed to Load: " + err.message);
 			}
 		}
-	});
+	}
+
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', init);
+	} else {
+		init();
+	}
 };
