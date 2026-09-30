@@ -18,6 +18,16 @@ module.exports = Ferdium => {
 	const STORAGE_KEY_TOOLBAR_ITEMS = "ferdiumGeminiModToolbarItems_v2";
 	const STORAGE_KEY_FOLDERS = 'ferdiumGeminiModFolders';
 	const STORAGE_KEY_CONVO_FOLDERS = 'ferdiumGeminiModConvoFolders';
+	const STORAGE_KEY_SYNC_KEY = 'gemini_mod_sync_key';
+	const STORAGE_KEY_AUTH_SESSION = 'gemini_mod_auth_session';
+	const STORAGE_KEY_SUPABASE_URL = 'gemini_mod_supabase_url';
+	const STORAGE_KEY_SUPABASE_KEY = 'gemini_mod_supabase_key';
+	const STORAGE_KEY_LAST_SYNC = 'gemini_mod_last_sync';
+	const STORAGE_KEY_LAST_SYNC_CLIENT = 'gemini_mod_last_sync_client';
+	const CLIENT_NAME = 'Ferdium';
+
+	// --- Toolbar UI Labels ---
+	const SETTINGS_BUTTON_LABEL = "⚙️ Settings";
 
 	// --- CSS Selectors ---
 	const GEMINI_INPUT_FIELD_SELECTORS = ['div[role="textbox"]', '.ql-editor p', '.ql-editor', 'div[contenteditable="true"]'];
@@ -27,7 +37,6 @@ module.exports = Ferdium => {
 
 	// --- Default Definitions ---
 	const defaultToolbarItems = [
-		{ type: 'settings', label: "⚙️" },
 		{ type: 'button', label: "Greeting", text: "Hello Gemini!" },
 		{ type: 'button', label: "Explain", text: "Could you please explain ... in more detail?" },
 		{
@@ -113,44 +122,87 @@ module.exports = Ferdium => {
 			position: fixed; top: 50%; left: 50%;
 			transform: translate(-50%, -50%);
 			background-color: #282a2c; color: #e3e3e3; border-radius: 16px;
-			padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+			padding: 0; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
 			font-family: 'Roboto', 'Arial', sans-serif !important;
+			overflow: hidden;
 		}
 		#gemini-mod-settings-panel {
-			width: 90vw; max-width: 800px; max-height: 80vh; overflow-y: auto;
+			width: 90vw; max-width: 820px; max-height: 85vh; display: flex; flex-direction: column;
 		}
 		#gemini-mod-type-modal {
-		    text-align: center;
+			text-align: center; padding: 20px;
 		}
 		#gemini-mod-type-modal h3 { margin-top: 0; }
 		#gemini-mod-type-modal button { margin: 0 10px; }
-		#gemini-mod-settings-panel h2 { margin-top: 0; border-bottom: 1px solid #444; padding-bottom: 10px; }
-        #gemini-mod-settings-panel h3 { margin-top: 20px; border-bottom: 1px solid #444; padding-bottom: 8px; }
+		#gemini-mod-settings-panel h2 {
+			margin: 0; padding: 16px 20px; border-bottom: 1px solid #444; background-color: #202122;
+			font-size: 1.2rem; font-weight: 600;
+		}
+		.settings-container { display: flex; height: 520px; max-height: 70vh; min-height: 420px; }
+		.settings-sidebar {
+			width: 180px; border-right: 1px solid #444; padding: 15px 10px; display: flex; flex-direction: column;
+			gap: 6px; background-color: #202122; flex-shrink: 0;
+		}
+		.settings-content {
+			flex-grow: 1; padding: 20px; overflow-y: auto; background-color: #282a2c;
+		}
+		.tab-btn {
+			text-align: left; padding: 10px 14px; background: none; border: none; color: #aaa;
+			cursor: pointer; border-radius: 8px; font-size: 14px; font-weight: 500;
+			transition: all 0.2s ease; width: 100%; box-sizing: border-box; font-family: inherit;
+		}
+		.tab-btn:hover { background-color: #3c4043; color: #e3e3e3; }
+		.tab-btn.active { background-color: #4285f4; color: white; }
+		.tab-pane { display: none; }
+		.tab-pane.active { display: block; animation: geminiFadeIn 0.2s; }
+		@keyframes geminiFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
 		#gemini-mod-settings-panel label { display: block; margin: 10px 0 5px; font-weight: 500; }
-		#gemini-mod-settings-panel input[type="text"], #gemini-mod-settings-panel textarea {
-			width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #5f6368;
-			background-color: #202122; color: #e3e3e3; box-sizing: border-box;
+		#gemini-mod-settings-panel input[type="text"], #gemini-mod-settings-panel input[type="email"], #gemini-mod-settings-panel input[type="password"], #gemini-mod-settings-panel textarea {
+			width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #5f6368;
+			background-color: #202122; color: #e3e3e3; box-sizing: border-box; font-family: inherit; font-size: 13px;
 		}
 		#gemini-mod-settings-panel textarea { min-height: 80px; resize: vertical; }
 		#gemini-mod-settings-panel .item-group {
 			border: 1px solid #444; border-radius: 8px; padding: 15px; margin-bottom: 10px;
-			display: flex; gap: 10px; align-items: flex-start;
-            cursor: grab;
+			display: flex; gap: 10px; align-items: flex-start; cursor: grab;
 		}
 		#gemini-mod-settings-panel .item-content { flex-grow: 1; }
 		#gemini-mod-settings-panel .dropdown-options-container { margin-left: 20px; margin-top: 10px; }
 		#gemini-mod-settings-panel .option-item { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: center; margin-bottom: 5px; }
 		#gemini-mod-settings-panel button {
-			 padding: 4px 10px !important; cursor: pointer !important; background-color: #3c4043 !important;
-			 color: #e3e3e3 !important; border-radius: 16px !important; font-size: 13px !important;
-			 border: none !important; transition: background-color 0.2s ease;
+			padding: 6px 14px !important; cursor: pointer !important; background-color: #3c4043 !important;
+			color: #e3e3e3 !important; border-radius: 16px !important; font-size: 13px !important;
+			border: none !important; transition: background-color 0.2s ease; font-family: inherit;
 		}
 		#gemini-mod-settings-panel button:hover { background-color: #4a4e51 !important; }
 		#gemini-mod-settings-panel .remove-btn, .dialog-btn-delete { background-color: #5c2b2b !important; color: white !important; }
 		#gemini-mod-settings-panel .remove-btn:hover, .dialog-btn-delete:hover { background-color: #7d3a3a !important; }
-		#gemini-mod-settings-panel .settings-actions {
-			margin-top: 20px; display: flex; justify-content: flex-end; gap: 8px;
+
+		/* Sync tab UI */
+		.sync-status-card {
+			background: #1e2022; border: 1px solid #3c4043; border-radius: 10px; padding: 14px 18px; margin-bottom: 16px;
 		}
+		.sync-status-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+		.sync-status-detail { font-size: 12px; color: #aaa; margin: 0; }
+		.sync-user-card {
+			display: flex; align-items: center; justify-content: space-between;
+			background: #2a2d30; border: 1px solid #3c4043; border-radius: 8px;
+			padding: 10px 14px; margin-bottom: 14px;
+		}
+		.sync-user-info { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #e3e3e3; font-weight: 500; }
+		.sync-auth-box {
+			background: #1e2022; border: 1px solid #3c4043; border-radius: 8px;
+			padding: 14px; margin-bottom: 16px;
+		}
+		.sync-auth-notice { font-size: 12px; color: #8ab4f8; margin: 0 0 12px 0; line-height: 1.4; }
+		.sync-auth-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+		.sync-auth-btns { display: flex; gap: 10px; margin-top: 12px; }
+		.sync-key-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; margin-bottom: 12px; }
+		.sync-actions-box { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; margin-bottom: 24px; }
+		.sync-btn-primary { background-color: #8ab4f8 !important; color: #1f1f1f !important; font-weight: 600 !important; }
+		.sync-advanced-details { margin-top: 20px; border-top: 1px solid #444; padding-top: 15px; }
+		.sync-advanced-details summary { cursor: pointer; color: #8ab4f8; font-size: 13px; user-select: none; }
 
 		/* --- Folder UI Styles --- */
 		/* Match Gemini sidebar design: Google Sans font, Material colors, proper spacing */
@@ -529,12 +581,10 @@ module.exports = Ferdium => {
 				if (!hasAction('download')) toolbarItems.push({ type: 'action', action: 'download', label: "💾 Download", title: "Download active canvas content" });
 				if (!hasAction('pdf')) toolbarItems.push({ type: 'action', action: 'pdf', label: "📑 PDF", title: "Export active canvas content as PDF" });
 
-				// Ensure Settings button exists
-				if (!toolbarItems.some(item => item.type === 'settings')) {
-					toolbarItems.unshift({ type: 'settings', label: "⚙️" });
-				}
+				// Filter out legacy settings item from toolbarItems so it is not rendered on the left
+				toolbarItems = toolbarItems.filter(item => item && item.type !== 'settings');
 			} else {
-				toolbarItems = defaultToolbarItems;
+				toolbarItems = defaultToolbarItems.filter(item => item && item.type !== 'settings');
 			}
 			// Folder items
 			const savedFolders = localStorage.getItem(STORAGE_KEY_FOLDERS);
@@ -544,7 +594,7 @@ module.exports = Ferdium => {
 			conversationFolders = savedConvoFolders ? JSON.parse(savedConvoFolders) : {};
 		} catch (e) {
 			console.error("Gemini Mod: Error loading configuration, using defaults.", e);
-			toolbarItems = defaultToolbarItems;
+			toolbarItems = defaultToolbarItems.filter(item => item && item.type !== 'settings');
 			folders = [];
 			conversationFolders = {};
 		}
@@ -1361,17 +1411,11 @@ module.exports = Ferdium => {
 
 		// Render User Items
 		toolbarItems.forEach(item => {
+			if (!item || item.type === 'settings') return; // Skip if null or legacy settings
 			// Respect Visibility Setting
 			if (item.visible === false) return; // Skip if hidden
 
-			if (item.type === 'settings') {
-				const settingsBtn = document.createElement('button');
-				settingsBtn.textContent = '⚙️';
-				settingsBtn.title = 'Gemini Mod Settings';
-				settingsBtn.className = 'gemini-mod-toolbar-btn settings-btn';
-				settingsBtn.addEventListener('click', () => toggleSettingsPanel());
-				toolbar.appendChild(settingsBtn);
-			} else if (item.type === 'button') {
+			if (item.type === 'button') {
 				const btn = document.createElement('button');
 				btn.textContent = item.label;
 				btn.className = 'gemini-mod-toolbar-btn';
@@ -1419,7 +1463,393 @@ module.exports = Ferdium => {
 				toolbar.appendChild(btn);
 			}
 		});
+
+		// Spacer to push settings to the far right
+		const spacer = document.createElement('div');
+		spacer.className = 'userscript-toolbar-spacer';
+		toolbar.appendChild(spacer);
+
+		// Fixed Settings button on the right end
+		const settingsBtn = document.createElement('button');
+		settingsBtn.textContent = SETTINGS_BUTTON_LABEL;
+		settingsBtn.title = 'Gemini Mod Settings';
+		settingsBtn.className = 'gemini-mod-toolbar-btn settings-btn';
+		settingsBtn.addEventListener('click', () => toggleSettingsPanel());
+		toolbar.appendChild(settingsBtn);
 	}
+
+	// ===================================================================================
+	// CLOUD SYNCHRONIZATION (SUPABASE) & BACKUP
+	// ===================================================================================
+
+	function displayMessage(message, isError = true) {
+		const prefix = "Gemini Mod: ";
+		if (isError) console.error(prefix + message);
+		else console.log(prefix + message);
+		alert(prefix + message);
+	}
+
+	const GeminiSync = {
+		DEFAULT_SUPABASE_URL: 'https://wurrurgloawzvtiyilyr.supabase.co',
+		DEFAULT_SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1cnJ1cmdsb2F3enZ0aXlpbHlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3NzgwODQsImV4cCI6MjEwNjM1NDA4NH0.aQ8GNObnE9xH8Jd3Rpv9eSp3c72ymjKuWC4Z8qGUQh4',
+
+		getSession: function () {
+			try {
+				const raw = localStorage.getItem(STORAGE_KEY_AUTH_SESSION);
+				return raw ? JSON.parse(raw) : null;
+			} catch (_) {
+				return null;
+			}
+		},
+
+		setSession: function (session) {
+			if (session) {
+				localStorage.setItem(STORAGE_KEY_AUTH_SESSION, JSON.stringify(session));
+			} else {
+				this.clearSession();
+			}
+		},
+
+		clearSession: function () {
+			localStorage.removeItem(STORAGE_KEY_AUTH_SESSION);
+		},
+
+		isAuthenticated: function () {
+			const s = this.getSession();
+			return !!(s && s.access_token && s.user);
+		},
+
+		getCurrentUser: function () {
+			const s = this.getSession();
+			return s ? s.user : null;
+		},
+
+		getSupabaseConfig: function () {
+			const url = localStorage.getItem(STORAGE_KEY_SUPABASE_URL) || this.DEFAULT_SUPABASE_URL;
+			const key = localStorage.getItem(STORAGE_KEY_SUPABASE_KEY) || this.DEFAULT_SUPABASE_KEY;
+			return {
+				url: url.trim().replace(/\/+$/, ''),
+				key: key.trim()
+			};
+		},
+
+		setSupabaseConfig: function (url, key) {
+			localStorage.setItem(STORAGE_KEY_SUPABASE_URL, (url || '').trim().replace(/\/+$/, ''));
+			localStorage.setItem(STORAGE_KEY_SUPABASE_KEY, (key || '').trim());
+		},
+
+		resetSupabaseConfig: function () {
+			localStorage.removeItem(STORAGE_KEY_SUPABASE_URL);
+			localStorage.removeItem(STORAGE_KEY_SUPABASE_KEY);
+		},
+
+		getLastSyncInfo: function () {
+			const ts = localStorage.getItem(STORAGE_KEY_LAST_SYNC);
+			const client = localStorage.getItem(STORAGE_KEY_LAST_SYNC_CLIENT);
+			return {
+				timestamp: ts ? parseInt(ts, 10) : null,
+				client: client || null
+			};
+		},
+
+		request: function (endpoint, method, data, config, customToken = null) {
+			return new Promise((resolve, reject) => {
+				const url = `${config.url}${endpoint}`;
+				const authToken = customToken || config.key;
+				const headers = {
+					'apikey': config.key,
+					'Authorization': `Bearer ${authToken}`
+				};
+				if (data) headers['Content-Type'] = 'application/json';
+				if (method === 'POST') {
+					headers['Prefer'] = 'resolution=merge-duplicates,return=representation';
+				}
+
+				// Priority 1: Node https if available
+				try {
+					const https = require('https');
+					const parsedUrl = new URL(url);
+					const postData = data ? JSON.stringify(data) : null;
+					const req = https.request({
+						hostname: parsedUrl.hostname,
+						port: parsedUrl.port || 443,
+						path: parsedUrl.pathname + parsedUrl.search,
+						method: method,
+						headers: {
+							...headers,
+							...(postData ? { 'Content-Length': Buffer.byteLength(postData) } : {})
+						}
+					}, (res) => {
+						let body = '';
+						res.on('data', chunk => body += chunk);
+						res.on('end', () => {
+							if (res.statusCode >= 200 && res.statusCode < 300) {
+								try { resolve(body ? JSON.parse(body) : null); }
+								catch (_) { resolve(body); }
+							} else {
+								let msg = `HTTP ${res.statusCode}`;
+								try {
+									const p = JSON.parse(body);
+									if (p.msg) msg = p.msg;
+									else if (p.message) msg = p.message;
+									else if (p.error_description) msg = p.error_description;
+									else if (p.error) msg = typeof p.error === 'string' ? p.error : JSON.stringify(p.error);
+								} catch (_) {
+									if (body) msg += `: ${body.slice(0, 100)}`;
+								}
+								reject(new Error(msg));
+							}
+						});
+					});
+					req.on('error', reject);
+					if (postData) req.write(postData);
+					req.end();
+					return;
+				} catch (nodeErr) {
+					// Fallback to fetch
+				}
+
+				// Priority 2: Fetch fallback
+				fetch(url, {
+					method: method,
+					headers: headers,
+					body: data ? JSON.stringify(data) : undefined
+				}).then(async res => {
+					if (res.ok) {
+						const txt = await res.text();
+						try { resolve(txt ? JSON.parse(txt) : null); }
+						catch (_) { resolve(txt); }
+					} else {
+						const txt = await res.text();
+						let msg = `HTTP ${res.status}`;
+						try {
+							const p = JSON.parse(txt);
+							if (p.msg) msg = p.msg;
+							else if (p.message) msg = p.message;
+							else if (p.error_description) msg = p.error_description;
+							else if (p.error) msg = typeof p.error === 'string' ? p.error : JSON.stringify(p.error);
+						} catch (_) {
+							if (txt) msg += `: ${txt.slice(0, 100)}`;
+						}
+						reject(new Error(msg));
+					}
+				}).catch(reject);
+			});
+		},
+
+		getValidAccessToken: async function () {
+			const session = this.getSession();
+			if (!session || !session.access_token) {
+				throw new Error("You must be logged in to sync settings.");
+			}
+
+			// If token expires in less than 60 seconds, refresh it
+			if (session.refresh_token && session.expires_at && (session.expires_at - Date.now() < 60000)) {
+				const config = this.getSupabaseConfig();
+				try {
+					const res = await this.request('/auth/v1/token?grant_type=refresh_token', 'POST', {
+						refresh_token: session.refresh_token
+					}, config);
+
+					if (res && res.access_token) {
+						const updatedSession = {
+							access_token: res.access_token,
+							refresh_token: res.refresh_token || session.refresh_token,
+							expires_at: Date.now() + ((res.expires_in || 3600) * 1000),
+							user: res.user || session.user
+						};
+						this.setSession(updatedSession);
+						return updatedSession.access_token;
+					}
+				} catch (refreshErr) {
+					console.warn("Gemini Mod: Token refresh failed:", refreshErr);
+					this.clearSession();
+					throw new Error("Session expired. Please log in again.");
+				}
+			}
+
+			return session.access_token;
+		},
+
+		signUp: async function (email, password) {
+			const cleanEmail = (email || '').trim();
+			const cleanPass = (password || '').trim();
+			if (!cleanEmail || !cleanEmail.includes('@')) {
+				throw new Error("Please enter a valid email address.");
+			}
+			if (!cleanPass || cleanPass.length < 6) {
+				throw new Error("Password must be at least 6 characters.");
+			}
+
+			const config = this.getSupabaseConfig();
+			const res = await this.request('/auth/v1/signup', 'POST', {
+				email: cleanEmail,
+				password: cleanPass
+			}, config);
+
+			// If auto-confirm gave us a session immediately:
+			if (res && res.access_token) {
+				const session = {
+					access_token: res.access_token,
+					refresh_token: res.refresh_token,
+					expires_at: Date.now() + ((res.expires_in || 3600) * 1000),
+					user: {
+						id: res.user.id,
+						email: res.user.email
+					}
+				};
+				this.setSession(session);
+				return session.user;
+			}
+
+			// Otherwise, perform sign in to fetch session tokens
+			return await this.signIn(cleanEmail, cleanPass);
+		},
+
+		signIn: async function (email, password) {
+			const cleanEmail = (email || '').trim();
+			const cleanPass = (password || '').trim();
+			if (!cleanEmail || !cleanPass) {
+				throw new Error("Please enter your email and password.");
+			}
+
+			const config = this.getSupabaseConfig();
+			const res = await this.request('/auth/v1/token?grant_type=password', 'POST', {
+				email: cleanEmail,
+				password: cleanPass
+			}, config);
+
+			if (!res || !res.access_token || !res.user) {
+				throw new Error("Invalid response received from authentication server.");
+			}
+
+			const session = {
+				access_token: res.access_token,
+				refresh_token: res.refresh_token,
+				expires_at: Date.now() + ((res.expires_in || 3600) * 1000),
+				user: {
+					id: res.user.id,
+					email: res.user.email
+				}
+			};
+			this.setSession(session);
+			return session.user;
+		},
+
+		signOut: async function () {
+			const session = this.getSession();
+			if (session && session.access_token) {
+				const config = this.getSupabaseConfig();
+				try {
+					await this.request('/auth/v1/logout', 'POST', null, config, session.access_token);
+				} catch (_) {
+					// Best effort
+				}
+			}
+			this.clearSession();
+		},
+
+		saveToCloud: async function (currentSettings, clientName = 'Ferdium') {
+			const token = await this.getValidAccessToken();
+			const session = this.getSession();
+			if (!session || !session.user || !session.user.id) {
+				throw new Error("Unable to identify authenticated user. Please log in again.");
+			}
+
+			const config = this.getSupabaseConfig();
+			const payload = {
+				user_id: session.user.id,
+				data: {
+					toolbarItems: currentSettings.toolbarItems,
+					folders: currentSettings.folders,
+					conversationFolders: currentSettings.conversationFolders,
+					timestamp: Date.now(),
+					client: clientName
+				},
+				client_name: clientName,
+				updated_at: new Date().toISOString()
+			};
+
+			// Check client-side payload size limit (Postgres limit is 500KB)
+			const serialized = JSON.stringify(payload.data);
+			if (serialized.length > 450000) {
+				throw new Error(`Settings size (${Math.round(serialized.length / 1024)} KB) exceeds the 450 KB safety limit.`);
+			}
+
+			await this.request('/rest/v1/gemini_mod_settings', 'POST', payload, config, token);
+
+			const now = Date.now();
+			localStorage.setItem(STORAGE_KEY_LAST_SYNC, now.toString());
+			localStorage.setItem(STORAGE_KEY_LAST_SYNC_CLIENT, clientName);
+			return payload;
+		},
+
+		loadFromCloud: async function () {
+			const token = await this.getValidAccessToken();
+			const config = this.getSupabaseConfig();
+			const endpoint = '/rest/v1/gemini_mod_settings?select=*';
+			const res = await this.request(endpoint, 'GET', null, config, token);
+
+			if (!res || !Array.isArray(res) || res.length === 0) {
+				throw new Error("No cloud backup found for this account. Upload your settings to the cloud first!");
+			}
+
+			const record = res[0];
+			const data = record.data;
+			if (!data || (!data.toolbarItems && !data.folders)) {
+				throw new Error("Invalid or empty data received from cloud.");
+			}
+
+			const sourceClient = record.client_name || data.client || 'Cloud';
+			const now = Date.now();
+			localStorage.setItem(STORAGE_KEY_LAST_SYNC, now.toString());
+			localStorage.setItem(STORAGE_KEY_LAST_SYNC_CLIENT, sourceClient);
+
+			return {
+				toolbarItems: data.toolbarItems || [],
+				folders: data.folders || [],
+				conversationFolders: data.conversationFolders || {},
+				timestamp: data.timestamp || record.updated_at,
+				client: sourceClient
+			};
+		},
+
+		exportSettingsToFile: function (dataToSave) {
+			const fullData = {
+				toolbarItems: dataToSave.toolbarItems,
+				folders: dataToSave.folders,
+				conversationFolders: dataToSave.conversationFolders,
+				timestamp: Date.now(),
+				version: 1
+			};
+			const blob = new Blob([JSON.stringify(fullData, null, 2)], { type: "application/json" });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `gemini_settings_backup_${new Date().toISOString().slice(0, 10)}.json`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		},
+
+		importSettingsFromFile: function (file, onImportSuccess) {
+			const reader = new FileReader();
+			reader.onload = async (e) => {
+				try {
+					const data = JSON.parse(e.target.result);
+					if (data && (data.toolbarItems || data.folders)) {
+						onImportSuccess(data);
+					} else {
+						alert("Invalid backup file: file must contain toolbarItems or folders.");
+					}
+				} catch (err) {
+					alert("Error reading file: " + err.message);
+				}
+			};
+			reader.readAsText(file);
+		}
+	};
 
 	// --- Settings Panel UI ---
 
@@ -1433,76 +1863,503 @@ module.exports = Ferdium => {
 		panel.id = 'gemini-mod-settings-panel';
 		overlay.appendChild(panel);
 
-		panel.appendChild(document.createElement('h2')).textContent = 'Gemini Mod Settings';
+		const header = document.createElement('h2');
+		header.textContent = 'Gemini Mod Settings';
+		panel.appendChild(header);
 
-		// Toolbar Section
-		panel.appendChild(document.createElement('h3')).textContent = 'Toolbar Items';
+		// Container for Tabbed Layout
+		const container = document.createElement('div');
+		container.className = 'settings-container';
+
+		// Sidebar
+		const sidebar = document.createElement('div');
+		sidebar.className = 'settings-sidebar';
+
+		const tabs = [
+			{ id: 'tab-toolbar', label: '🛠️ Toolbar' },
+			{ id: 'tab-sync', label: '☁️ Cloud Sync' },
+			{ id: 'tab-reset', label: '⚠️ Danger Zone' }
+		];
+
+		// Content Area
+		const content = document.createElement('div');
+		content.className = 'settings-content';
+
+		tabs.forEach((tab, index) => {
+			const btn = document.createElement('button');
+			btn.className = 'tab-btn' + (index === 0 ? ' active' : '');
+			btn.textContent = tab.label;
+			btn.dataset.target = tab.id;
+			btn.onclick = () => {
+				sidebar.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+				content.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+				btn.classList.add('active');
+				const targetPane = document.getElementById(tab.id);
+				if (targetPane) targetPane.classList.add('active');
+				if (tab.id === 'tab-sync') updateSettingsPanelSyncStatus();
+			};
+			sidebar.appendChild(btn);
+		});
+
+		// Footer Buttons in Sidebar
+		const sidebarFooter = document.createElement('div');
+		sidebarFooter.style.marginTop = 'auto';
+		sidebarFooter.style.display = 'flex';
+		sidebarFooter.style.flexDirection = 'column';
+		sidebarFooter.style.gap = '8px';
+		sidebarFooter.style.width = '100%';
+
+		const closeBtn = document.createElement('button');
+		closeBtn.textContent = 'Close';
+		closeBtn.className = 'custom-dialog-btn dialog-btn-cancel';
+		closeBtn.style.width = '100%';
+		closeBtn.style.margin = '0';
+		closeBtn.addEventListener('click', () => toggleSettingsPanel(false));
+		sidebarFooter.appendChild(closeBtn);
+
+		const saveBtn = document.createElement('button');
+		saveBtn.textContent = 'Save & Close';
+		saveBtn.className = 'custom-dialog-btn dialog-btn-confirm';
+		saveBtn.style.width = '100%';
+		saveBtn.style.margin = '0';
+		saveBtn.addEventListener('click', saveToolbarConfiguration);
+		sidebarFooter.appendChild(saveBtn);
+
+		sidebar.appendChild(sidebarFooter);
+		container.appendChild(sidebar);
+
+		// --- TAB 1: TOOLBAR ---
+		const tabToolbar = document.createElement('div');
+		tabToolbar.id = 'tab-toolbar';
+		tabToolbar.className = 'tab-pane active';
+
+		const addItemBtn = document.createElement('button');
+		addItemBtn.textContent = '+ Add Toolbar Item';
+		addItemBtn.className = 'custom-dialog-btn dialog-btn-confirm';
+		addItemBtn.style.marginBottom = '15px';
+		addItemBtn.addEventListener('click', showToolbarItemTypeModal);
+		tabToolbar.appendChild(addItemBtn);
+
 		const dragDropHint = document.createElement('p');
 		dragDropHint.textContent = 'The order of the items can be changed via Drag & Drop.';
 		dragDropHint.style.fontSize = '12px';
 		dragDropHint.style.color = '#aaa';
-		dragDropHint.style.margin = '-5px 0 10px 0';
-		panel.appendChild(dragDropHint);
+		dragDropHint.style.margin = '0 0 10px 0';
+		tabToolbar.appendChild(dragDropHint);
 
 		const itemsContainer = document.createElement('div');
 		itemsContainer.id = 'toolbar-items-container';
-		panel.appendChild(itemsContainer);
+		tabToolbar.appendChild(itemsContainer);
 
-		const addItemBtn = document.createElement('button');
-		addItemBtn.textContent = 'Add Toolbar Item';
-		addItemBtn.addEventListener('click', showToolbarItemTypeModal);
-		panel.appendChild(addItemBtn);
+		content.appendChild(tabToolbar);
 
-		// Folder Section
-		panel.appendChild(document.createElement('h3')).textContent = 'Reset Settings';
+		// --- TAB 2: CLOUD SYNC ---
+		const tabSync = document.createElement('div');
+		tabSync.id = 'tab-sync';
+		tabSync.className = 'tab-pane';
 
-		const resetContainer = document.createElement('div');
-		resetContainer.style.display = 'flex';
-		resetContainer.style.gap = '10px';
-		resetContainer.style.flexWrap = 'wrap';
+		const syncHeading = document.createElement('h3');
+		syncHeading.textContent = 'Cloud Synchronization (Supabase)';
+		syncHeading.style.marginTop = '0';
+		tabSync.appendChild(syncHeading);
+
+		const syncDesc = document.createElement('p');
+		syncDesc.textContent = 'Synchronize toolbar items, folders, and conversation mappings between Ferdium, browser userscripts, and across devices.';
+		syncDesc.style.fontSize = '13px';
+		syncDesc.style.color = '#aaa';
+		syncDesc.style.marginTop = '-5px';
+		tabSync.appendChild(syncDesc);
+
+		// Status card
+		const statusCard = document.createElement('div');
+		statusCard.className = 'sync-status-card';
+		const statusTitle = document.createElement('div');
+		statusTitle.id = 'sync-status-text';
+		statusTitle.className = 'sync-status-title';
+		statusTitle.textContent = 'Status: Checking...';
+		statusTitle.style.color = '#8ab4f8';
+		const statusDetail = document.createElement('div');
+		statusDetail.id = 'sync-last-time-text';
+		statusDetail.className = 'sync-status-detail';
+		statusDetail.textContent = '';
+		statusCard.appendChild(statusTitle);
+		statusCard.appendChild(statusDetail);
+		tabSync.appendChild(statusCard);
+
+		// Container 1: Logged-in view
+		const loggedInBox = document.createElement('div');
+		loggedInBox.id = 'sync-auth-logged-in';
+		loggedInBox.style.display = 'none';
+
+		const userCard = document.createElement('div');
+		userCard.className = 'sync-user-card';
+
+		const userInfo = document.createElement('div');
+		userInfo.className = 'sync-user-info';
+		const userIcon = document.createElement('span');
+		userIcon.textContent = '👤';
+		const userEmail = document.createElement('span');
+		userEmail.id = 'sync-user-email';
+		userEmail.textContent = '';
+		userInfo.appendChild(userIcon);
+		userInfo.appendChild(userEmail);
+
+		const logoutBtn = document.createElement('button');
+		logoutBtn.textContent = '🚪 Log Out';
+		logoutBtn.className = 'remove-btn';
+		logoutBtn.title = 'Log out of Supabase on this device';
+		logoutBtn.onclick = async () => {
+			await GeminiSync.signOut();
+			updateSettingsPanelSyncStatus();
+			displayMessage("Logged out successfully.", false);
+		};
+
+		userCard.appendChild(userInfo);
+		userCard.appendChild(logoutBtn);
+		loggedInBox.appendChild(userCard);
+
+		// Sync Actions Box (for logged in users)
+		const actionsBox = document.createElement('div');
+		actionsBox.className = 'sync-actions-box';
+
+		const uploadBtn = document.createElement('button');
+		uploadBtn.textContent = '☁️ Upload to Cloud (Backup)';
+		uploadBtn.className = 'sync-btn-primary';
+		uploadBtn.title = 'Upload current Ferdium settings and folders to Supabase';
+		uploadBtn.onclick = async () => {
+			try {
+				await GeminiSync.saveToCloud({
+					toolbarItems,
+					folders,
+					conversationFolders
+				}, CLIENT_NAME);
+				updateSettingsPanelSyncStatus();
+				displayMessage("Settings uploaded to Cloud successfully!", false);
+			} catch (err) {
+				displayMessage("Upload failed: " + err.message);
+			}
+		};
+
+		const downloadBtn = document.createElement('button');
+		downloadBtn.textContent = '☁️ Download from Cloud (Sync)';
+		downloadBtn.className = 'sync-btn-primary';
+		downloadBtn.title = 'Download settings and folders from Supabase and apply them';
+		downloadBtn.onclick = async () => {
+			try {
+				const remote = await GeminiSync.loadFromCloud();
+				const clientStr = remote.client ? ` (from ${remote.client})` : '';
+				const timeStr = remote.timestamp ? ` from ${new Date(remote.timestamp).toLocaleString()}` : '';
+				showConfirmationDialog(`This will overwrite your local configuration with cloud settings${clientStr}${timeStr}. Continue?`, () => {
+					localStorage.setItem(STORAGE_KEY_TOOLBAR_ITEMS, JSON.stringify(remote.toolbarItems));
+					localStorage.setItem(STORAGE_KEY_FOLDERS, JSON.stringify(remote.folders));
+					localStorage.setItem(STORAGE_KEY_CONVO_FOLDERS, JSON.stringify(remote.conversationFolders || {}));
+					displayMessage("Settings downloaded from Cloud! Reloading...", false);
+					setTimeout(() => window.location.reload(), 1000);
+				}, 'Overwrite & Apply', 'dialog-btn-confirm');
+			} catch (err) {
+				displayMessage("Download failed: " + err.message);
+			}
+		};
+
+		actionsBox.appendChild(uploadBtn);
+		actionsBox.appendChild(downloadBtn);
+		loggedInBox.appendChild(actionsBox);
+		tabSync.appendChild(loggedInBox);
+
+		// Container 2: Logged-out view (Sign Up / Log In)
+		const loggedOutBox = document.createElement('div');
+		loggedOutBox.id = 'sync-auth-logged-out';
+		loggedOutBox.className = 'sync-auth-box';
+
+		const authNotice = document.createElement('div');
+		authNotice.className = 'sync-auth-notice';
+		authNotice.textContent = '🛡️ Multi-User Protection: Log in with your email and password to securely access your settings. Each user\'s configuration is strictly isolated with Row-Level Security.';
+		loggedOutBox.appendChild(authNotice);
+
+		const emailLabel = document.createElement('label');
+		emailLabel.textContent = 'Email:';
+		loggedOutBox.appendChild(emailLabel);
+
+		const emailInput = document.createElement('input');
+		emailInput.id = 'sync-email-input';
+		emailInput.type = 'email';
+		emailInput.placeholder = 'your.email@example.com';
+		loggedOutBox.appendChild(emailInput);
+
+		const passLabel = document.createElement('label');
+		passLabel.textContent = 'Password:';
+		loggedOutBox.appendChild(passLabel);
+
+		const passRow = document.createElement('div');
+		passRow.className = 'sync-auth-row';
+
+		const passInput = document.createElement('input');
+		passInput.id = 'sync-password-input';
+		passInput.type = 'password';
+		passInput.placeholder = 'Password (min. 6 characters)';
+		passInput.style.flexGrow = '1';
+
+		const togglePassBtn = document.createElement('button');
+		togglePassBtn.textContent = '👁️';
+		togglePassBtn.title = 'Toggle Password Visibility';
+		togglePassBtn.onclick = () => {
+			passInput.type = passInput.type === 'password' ? 'text' : 'password';
+		};
+
+		passRow.appendChild(passInput);
+		passRow.appendChild(togglePassBtn);
+		loggedOutBox.appendChild(passRow);
+
+		const authBtnsRow = document.createElement('div');
+		authBtnsRow.className = 'sync-auth-btns';
+
+		const loginBtn = document.createElement('button');
+		loginBtn.textContent = '🔑 Log In';
+		loginBtn.className = 'sync-btn-primary';
+		loginBtn.onclick = async () => {
+			const email = emailInput.value.trim();
+			const pass = passInput.value.trim();
+			if (!email || !pass) {
+				displayMessage("Please enter your email and password.");
+				return;
+			}
+			try {
+				loginBtn.disabled = true;
+				loginBtn.textContent = 'Logging in...';
+				const user = await GeminiSync.signIn(email, pass);
+				passInput.value = '';
+				updateSettingsPanelSyncStatus();
+				displayMessage(`Welcome back, ${user.email}!`, false);
+			} catch (err) {
+				displayMessage("Login failed: " + err.message);
+			} finally {
+				loginBtn.disabled = false;
+				loginBtn.textContent = '🔑 Log In';
+			}
+		};
+
+		const signupBtn = document.createElement('button');
+		signupBtn.textContent = '✨ Sign Up';
+		signupBtn.title = 'Create a new sync account with this email and password';
+		signupBtn.onclick = async () => {
+			const email = emailInput.value.trim();
+			const pass = passInput.value.trim();
+			if (!email || !pass) {
+				displayMessage("Please enter an email and password to create an account.");
+				return;
+			}
+			try {
+				signupBtn.disabled = true;
+				signupBtn.textContent = 'Signing up...';
+				const user = await GeminiSync.signUp(email, pass);
+				passInput.value = '';
+				updateSettingsPanelSyncStatus();
+				displayMessage(`Account created and connected as ${user.email}!`, false);
+			} catch (err) {
+				displayMessage("Sign up failed: " + err.message);
+			} finally {
+				signupBtn.disabled = false;
+				signupBtn.textContent = '✨ Sign Up';
+			}
+		};
+
+		authBtnsRow.appendChild(loginBtn);
+		authBtnsRow.appendChild(signupBtn);
+		loggedOutBox.appendChild(authBtnsRow);
+
+		const signupHelp = document.createElement('p');
+		signupHelp.textContent = '💡 First time? Enter your email and password, then click "Sign Up" to create your personal account.';
+		signupHelp.style.fontSize = '12px';
+		signupHelp.style.color = '#8ab4f8';
+		signupHelp.style.margin = '10px 0 0 0';
+		loggedOutBox.appendChild(signupHelp);
+
+		tabSync.appendChild(loggedOutBox);
+
+		// Manual File Backup Section
+		const manualHeader = document.createElement('h3');
+		manualHeader.textContent = 'Manual File Backup';
+		tabSync.appendChild(manualHeader);
+
+		const manualDesc = document.createElement('p');
+		manualDesc.textContent = 'Export or import your complete configuration to/from a local .json file.';
+		manualDesc.style.fontSize = '12px';
+		manualDesc.style.color = '#aaa';
+		manualDesc.style.marginTop = '-5px';
+		tabSync.appendChild(manualDesc);
+
+		const fileRow = document.createElement('div');
+		fileRow.style.display = 'flex';
+		fileRow.style.gap = '10px';
+		fileRow.style.marginBottom = '20px';
+
+		const exportBtn = document.createElement('button');
+		exportBtn.textContent = '⬇️ Export to File';
+		exportBtn.onclick = () => {
+			GeminiSync.exportSettingsToFile({ toolbarItems, folders, conversationFolders });
+		};
+
+		const importInput = document.createElement('input');
+		importInput.type = 'file';
+		importInput.accept = '.json';
+		importInput.style.display = 'none';
+		importInput.onchange = (e) => {
+			if (e.target.files.length > 0) {
+				GeminiSync.importSettingsFromFile(e.target.files[0], (imported) => {
+					showConfirmationDialog('Overwrite local settings with imported backup file?', () => {
+						if (imported.toolbarItems) localStorage.setItem(STORAGE_KEY_TOOLBAR_ITEMS, JSON.stringify(imported.toolbarItems));
+						if (imported.folders) localStorage.setItem(STORAGE_KEY_FOLDERS, JSON.stringify(imported.folders));
+						if (imported.conversationFolders) localStorage.setItem(STORAGE_KEY_CONVO_FOLDERS, JSON.stringify(imported.conversationFolders));
+						displayMessage("Backup imported successfully! Reloading...", false);
+						setTimeout(() => window.location.reload(), 1000);
+					}, 'Import & Overwrite', 'dialog-btn-confirm');
+				});
+			}
+		};
+
+		const importBtn = document.createElement('button');
+		importBtn.textContent = '⬆️ Import from File';
+		importBtn.onclick = () => importInput.click();
+
+		fileRow.appendChild(exportBtn);
+		fileRow.appendChild(importBtn);
+		fileRow.appendChild(importInput);
+		tabSync.appendChild(fileRow);
+
+		// Advanced Supabase Connection
+		const advancedDetails = document.createElement('details');
+		advancedDetails.className = 'sync-advanced-details';
+		const advancedSummary = document.createElement('summary');
+		advancedSummary.textContent = '⚙️ Advanced Supabase Connection Settings';
+		advancedDetails.appendChild(advancedSummary);
+
+		const cfg = GeminiSync.getSupabaseConfig();
+
+		const urlLabel = document.createElement('label');
+		urlLabel.textContent = 'Supabase Project URL:';
+		advancedDetails.appendChild(urlLabel);
+		const urlInput = document.createElement('input');
+		urlInput.type = 'text';
+		urlInput.value = cfg.url;
+		advancedDetails.appendChild(urlInput);
+
+		const keyAdvLabel = document.createElement('label');
+		keyAdvLabel.textContent = 'Supabase Anon/Publishable Key:';
+		advancedDetails.appendChild(keyAdvLabel);
+		const keyAdvInput = document.createElement('input');
+		keyAdvInput.type = 'password';
+		keyAdvInput.value = cfg.key;
+		advancedDetails.appendChild(keyAdvInput);
+
+		const advBtnsRow = document.createElement('div');
+		advBtnsRow.style.display = 'flex';
+		advBtnsRow.style.gap = '8px';
+		advBtnsRow.style.marginTop = '10px';
+
+		const saveCfgBtn = document.createElement('button');
+		saveCfgBtn.textContent = 'Save Custom Connection';
+		saveCfgBtn.onclick = () => {
+			GeminiSync.setSupabaseConfig(urlInput.value, keyAdvInput.value);
+			displayMessage("Custom Supabase connection saved!", false);
+		};
+
+		const resetCfgBtn = document.createElement('button');
+		resetCfgBtn.textContent = 'Reset to Default Supabase Project';
+		resetCfgBtn.onclick = () => {
+			GeminiSync.resetSupabaseConfig();
+			urlInput.value = GeminiSync.DEFAULT_SUPABASE_URL;
+			keyAdvInput.value = GeminiSync.DEFAULT_SUPABASE_KEY;
+			displayMessage("Reset to default Supabase project.", false);
+		};
+
+		advBtnsRow.appendChild(saveCfgBtn);
+		advBtnsRow.appendChild(resetCfgBtn);
+		advancedDetails.appendChild(advBtnsRow);
+
+		tabSync.appendChild(advancedDetails);
+		content.appendChild(tabSync);
+
+		// --- TAB 3: DANGER ZONE ---
+		const tabReset = document.createElement('div');
+		tabReset.id = 'tab-reset';
+		tabReset.className = 'tab-pane';
+
+		const resetHeading = document.createElement('h3');
+		resetHeading.textContent = 'Danger Zone';
+		resetHeading.style.marginTop = '0';
+		tabReset.appendChild(resetHeading);
 
 		const resetFoldersBtn = document.createElement('button');
-		resetFoldersBtn.textContent = 'Reset Folders';
+		resetFoldersBtn.textContent = 'Reset Folders Only';
 		resetFoldersBtn.className = 'remove-btn';
+		resetFoldersBtn.style.display = 'block';
+		resetFoldersBtn.style.marginBottom = '15px';
 		resetFoldersBtn.addEventListener('click', () => {
 			showConfirmationDialog('Are you sure you want to delete all folder data? This cannot be undone.', () => {
 				localStorage.removeItem(STORAGE_KEY_FOLDERS);
 				localStorage.removeItem(STORAGE_KEY_CONVO_FOLDERS);
 				window.location.reload();
-			}, 'Reset', 'dialog-btn-delete');
+			}, 'Reset Folders', 'dialog-btn-delete');
 		});
+		tabReset.appendChild(resetFoldersBtn);
 
 		const resetEverythingBtn = document.createElement('button');
-		resetEverythingBtn.textContent = 'Reset Everything';
+		resetEverythingBtn.textContent = 'Reset EVERYTHING (Factory Reset)';
 		resetEverythingBtn.className = 'remove-btn';
+		resetEverythingBtn.style.backgroundColor = '#cc2929';
 		resetEverythingBtn.addEventListener('click', () => {
-			showConfirmationDialog('Are you sure you want to delete ALL data (Folders, Toolbar, Settings)? This cannot be undone.', () => {
+			showConfirmationDialog('Are you sure you want to delete ALL data (Folders, Toolbar, Sync configuration)? This cannot be undone.', () => {
 				localStorage.removeItem(STORAGE_KEY_FOLDERS);
 				localStorage.removeItem(STORAGE_KEY_CONVO_FOLDERS);
 				localStorage.removeItem(STORAGE_KEY_TOOLBAR_ITEMS);
+				localStorage.removeItem(STORAGE_KEY_SYNC_KEY);
+				localStorage.removeItem(STORAGE_KEY_AUTH_SESSION);
+				localStorage.removeItem(STORAGE_KEY_LAST_SYNC);
+				localStorage.removeItem(STORAGE_KEY_LAST_SYNC_CLIENT);
 				window.location.reload();
 			}, 'Reset Everything', 'dialog-btn-delete');
 		});
+		tabReset.appendChild(resetEverythingBtn);
 
-		resetContainer.appendChild(resetFoldersBtn);
-		resetContainer.appendChild(resetEverythingBtn);
-		panel.appendChild(resetContainer);
+		content.appendChild(tabReset);
 
-
-		const actionsDiv = document.createElement('div');
-		actionsDiv.className = 'settings-actions';
-		const saveBtn = document.createElement('button');
-		saveBtn.textContent = 'Save & Close';
-		saveBtn.addEventListener('click', saveToolbarConfiguration);
-		actionsDiv.appendChild(saveBtn);
-
-		const cancelBtn = document.createElement('button');
-		cancelBtn.textContent = 'Cancel';
-		cancelBtn.addEventListener('click', () => toggleSettingsPanel(false));
-		actionsDiv.appendChild(cancelBtn);
-		panel.appendChild(actionsDiv);
-
+		container.appendChild(content);
+		panel.appendChild(container);
 		document.body.appendChild(overlay);
+	}
+
+	function updateSettingsPanelSyncStatus() {
+		const statusText = document.getElementById('sync-status-text');
+		const lastTimeText = document.getElementById('sync-last-time-text');
+		const loggedInBox = document.getElementById('sync-auth-logged-in');
+		const loggedOutBox = document.getElementById('sync-auth-logged-out');
+		const userEmailEl = document.getElementById('sync-user-email');
+		if (!statusText) return;
+
+		const isAuth = GeminiSync.isAuthenticated();
+		const user = GeminiSync.getCurrentUser();
+
+		if (isAuth && user) {
+			statusText.textContent = `Status: Connected as ${user.email} ✅`;
+			statusText.style.color = "#81c995";
+			if (userEmailEl) userEmailEl.textContent = user.email;
+			if (loggedInBox) loggedInBox.style.display = 'block';
+			if (loggedOutBox) loggedOutBox.style.display = 'none';
+		} else {
+			statusText.textContent = "Status: Not logged in (Authentication required) 🔒";
+			statusText.style.color = "#f2994a";
+			if (loggedInBox) loggedInBox.style.display = 'none';
+			if (loggedOutBox) loggedOutBox.style.display = 'block';
+		}
+
+		if (lastTimeText) {
+			const { timestamp, client } = GeminiSync.getLastSyncInfo();
+			if (timestamp) {
+				lastTimeText.textContent = `Last synchronized: ${new Date(timestamp).toLocaleString()} (${client || 'Cloud'})`;
+			} else {
+				lastTimeText.textContent = "Never synchronized yet.";
+			}
+		}
 	}
 
 	function showToolbarItemTypeModal() {
@@ -1784,13 +2641,18 @@ module.exports = Ferdium => {
 	}
 
 	function toggleSettingsPanel(forceState) {
-		const overlay = document.getElementById('gemini-mod-settings-overlay');
+		let overlay = document.getElementById('gemini-mod-settings-overlay');
+		if (!overlay) {
+			createSettingsPanel();
+			overlay = document.getElementById('gemini-mod-settings-overlay');
+		}
 		if (!overlay) return;
 		const isVisible = overlay.style.display === 'block';
 		const show = typeof forceState === 'boolean' ? forceState : !isVisible;
 
 		if (show) {
 			populateSettingsPanel();
+			updateSettingsPanelSyncStatus();
 			const itemsContainer = document.getElementById('toolbar-items-container');
 			if (itemsContainer && Sortable && (!itemsContainer.classList.contains('gemini-mod-sortable-init') || !Sortable.get(itemsContainer))) {
 				itemsContainer.classList.add('gemini-mod-sortable-init');

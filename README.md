@@ -37,6 +37,12 @@ Keep your workspace clean and organized.
 - **💾 Download**: Download the active code or canvas content as a file.
 - **📑 PDF Export**: Export the current view or code to a formatted PDF.
 
+### ☁️ Secure Cloud Sync (Supabase)
+- **Multi-User Security & Isolation**: Individual user accounts powered by Supabase Auth with Row-Level Security (RLS). Your configuration is strictly protected and isolated to your account.
+- **Cross-App Synchronization**: Seamlessly sync your toolbar, folders, and conversation mappings between Ferdium and the browser Userscript.
+- **Instant Signup & Login**: Enter your email and password to instantly create an account and backup/sync across all your machines.
+- **Manual File Backup**: Export and import complete configuration `.json` files locally anytime as an offline fallback.
+
 ---
 
 ## ⚙️ Configuration
