@@ -746,7 +746,9 @@ module.exports = Ferdium => {
 		svg.style.display = 'block';
 		svg.style.transition = 'transform 0.2s ease';
 		svg.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
-		svg.innerHTML = '<path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>';
+		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+		path.setAttribute('d', 'M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z');
+		svg.appendChild(path);
 		return svg;
 	}
 
