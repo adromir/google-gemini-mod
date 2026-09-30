@@ -181,6 +181,7 @@ module.exports = Ferdium => {
 			margin: 0 !important;
 			padding: 0;
 			font-family: "Google Sans Flex","Google Sans Text","Google Sans",sans-serif;
+			box-sizing: border-box;
 		}
 
 		/* --- Section header: matches "Notebooks" style --- */
@@ -188,83 +189,196 @@ module.exports = Ferdium => {
 			display: flex;
 			flex-direction: row;
 			align-items: center;
-			width: 100%;
-			box-sizing: border-box;
-			padding: 0 16px;
-			min-height: 36px;
-			background: transparent;
-			border: none;
+			justify-content: space-between;
+			width: calc(100% - 16px) !important;
+			margin: 2px 8px !important;
+			box-sizing: border-box !important;
+			padding: 0 12px !important;
+			min-height: 36px !important;
+			background: transparent !important;
+			border: none !important;
+			border-radius: 9999px !important;
 			cursor: pointer;
 			text-align: left;
-			color: inherit;
+			color: #c4c7c5 !important;
 			font-family: inherit;
-			margin: 0;
 			gap: 8px;
+			transition: background-color 0.15s ease, color 0.15s ease;
+			outline: none;
 		}
 		#folder-section-header:hover {
-			background-color: var(--mat-list-list-item-hover-state-layer-color, rgba(227, 227, 227, 0.08));
+			background-color: rgba(227, 227, 227, 0.08) !important;
+			color: #e3e3e3 !important;
 		}
 		#folder-section-header .expandable-section-title {
 			flex: 1;
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			font-size: 0.875rem;
+			font-weight: 500;
+			line-height: 1.25rem;
+		}
+		#folder-section-header .toggle-icon {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			flex-shrink: 0;
+			margin-left: auto;
+			color: #c4c7c5;
+			font-size: 18px;
+		}
+		#folder-section-header:hover .toggle-icon {
+			color: #e3e3e3;
 		}
 		
 		/* Folder Items & Add Button */
 		#folder-container { padding-bottom: 4px; }
 		
-		#add-folder-btn, .folder-header {
-			display: flex; flex-direction: row; align-items: center; justify-content: flex-start;
-			width: 100%; box-sizing: border-box;
-			padding: 0 16px; min-height: 36px;
-			background: transparent; border: none; color: inherit;
-			border-radius: 9999px; cursor: pointer; text-align: left;
-			position: relative;
+		#add-folder-btn {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: flex-start;
+			width: calc(100% - 16px) !important;
+			margin: 2px 8px !important;
+			box-sizing: border-box !important;
+			padding: 0 12px !important;
+			min-height: 36px !important;
+			background: transparent !important;
+			border: none !important;
+			color: #c4c7c5 !important;
+			border-radius: 9999px !important;
+			cursor: pointer;
+			text-align: left;
+			font-family: "Google Sans Flex","Google Sans Text","Google Sans",sans-serif;
+			font-size: 0.875rem;
+			font-weight: 400;
+			gap: 0 !important;
+			transition: background-color 0.15s ease, color 0.15s ease;
+			outline: none;
 		}
-		#add-folder-btn:hover, .folder-header:hover {
-			background-color: var(--mat-list-list-item-hover-state-layer-color, rgba(227, 227, 227, 0.08)) !important;
+		#add-folder-btn::before { content: none !important; }
+		#add-folder-btn:hover {
+			background-color: rgba(227, 227, 227, 0.08) !important;
+			color: #e3e3e3 !important;
 		}
 		
 		.add-folder-icon, .folder-icon-wrapper { 
-			margin-right: 12px; display: flex; align-items: center; justify-content: center;
+			margin-right: 12px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			flex-shrink: 0;
 		}
 
 		/* Folder Specific */
 		.folder { margin: 0; padding: 0; overflow: visible; }
-		.folder-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 0; padding-right: 28px; }
-
-		.folder-controls { position: absolute; right: 12px; display: none; align-items: center; gap: 4px; flex-shrink: 0; z-index: 10; }
-		.folder:hover .folder-controls { display: flex; }
-		.folder-controls button {
-			background: transparent !important; color: #a8c7fa !important; border: none; font-size: 14px;
-			cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: background-color 0.2s;
+		.folder-header {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: flex-start;
+			width: calc(100% - 16px) !important;
+			margin: 2px 8px !important;
+			box-sizing: border-box !important;
+			padding: 0 12px !important;
+			min-height: 36px !important;
+			background: transparent !important;
+			border: none !important;
+			color: #e3e3e3 !important;
+			border-radius: 9999px !important;
+			cursor: pointer;
+			text-align: left;
+			position: relative;
+			font-family: "Google Sans Flex","Google Sans Text","Google Sans",sans-serif;
+			font-size: 0.875rem;
+			transition: background-color 0.15s ease;
+			outline: none;
 		}
-		.folder-toggle-icon { transition: transform 0.2s; font-size: 0.7em; opacity: 0.6; color: #c4c7c5; }
-		.folder.closed .folder-toggle-icon { transform: rotate(-90deg); }
+		.folder-header:hover {
+			background-color: rgba(227, 227, 227, 0.08) !important;
+		}
+		.folder-name {
+			flex: 1;
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			margin-left: 0;
+			padding-right: 8px;
+			font-size: 0.875rem;
+		}
+
+		.folder-controls {
+			display: flex;
+			align-items: center;
+			gap: 4px;
+			flex-shrink: 0;
+			margin-left: auto;
+		}
 		.folder-options-btn {
-			background: none; border: none; color: #c4c7c5; cursor: pointer;
-			padding: 4px; border-radius: 50%; width: 28px; height: 28px;
-			display: flex; align-items: center; justify-content: center;
-			font-size: 1.1em; line-height: 1;
+			background: none !important;
+			border: none !important;
+			color: #c4c7c5 !important;
+			cursor: pointer;
+			padding: 0;
+			border-radius: 50% !important;
+			width: 24px;
+			height: 24px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 1.1em;
+			line-height: 1;
 			opacity: 0;
 			transition: opacity 0.15s, background-color 0.15s;
 		}
-		.folder-header:hover .folder-options-btn { opacity: 1; }
-		.folder-options-btn:hover { background-color: rgba(227, 227, 227, 0.12); }
+		.folder-header:hover .folder-options-btn {
+			opacity: 1;
+		}
+		.folder-options-btn:hover {
+			background-color: rgba(227, 227, 227, 0.12) !important;
+			color: #fff !important;
+		}
+
+		.folder-toggle-icon {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			width: 20px;
+			height: 20px;
+			transition: transform 0.2s;
+			color: #c4c7c5;
+			font-size: 16px;
+		}
+		.folder.closed .folder-toggle-icon {
+			transform: rotate(-90deg);
+		}
+		.folder-header:hover .folder-toggle-icon {
+			color: #e3e3e3;
+		}
 
 		/* Folder content area - items inside */
 		.folder-content {
 			min-height: 0;
-			max-height: 600px;
+			max-height: 2000px;
 			overflow: hidden;
 			transition: max-height 0.25s ease-in-out;
 		}
-		.folder.closed .folder-content { max-height: 0; }
+		.folder.closed .folder-content {
+			max-height: 0;
+		}
 
 		/* Chat items inside folders - match gem-nav-list-item look */
 		.folder-content .conversation-items-container,
 		.folder-content gem-nav-list-item {
 			display: block;
-			border-radius: 9999px;
-			margin: 0 8px;
+			border-radius: 9999px !important;
+			margin: 2px 8px !important;
+			width: calc(100% - 16px) !important;
+			box-sizing: border-box !important;
 			padding: 0;
 			border: none;
 			transition: background-color 0.15s;
@@ -276,21 +390,8 @@ module.exports = Ferdium => {
 		}
 		.folder-content .conversation-items-container:hover,
 		.folder-content gem-nav-list-item:hover {
-			background-color: var(--mat-list-list-item-hover-state-layer-color, rgba(227, 227, 227, 0.08));
+			background-color: rgba(227, 227, 227, 0.08) !important;
 		}
-
-		/* "New Folder" button matching Gemini's nav style */
-		#add-folder-btn {
-			width: calc(100% - 16px) !important;
-			margin: 2px 8px !important;
-			color: #c4c7c5;
-			font-family: "Google Sans Flex","Google Sans Text","Google Sans",sans-serif;
-			font-size: 0.875rem;
-			font-weight: 400;
-			gap: 0 !important;
-		}
-		#add-folder-btn::before { content: none !important; }
-		#add-folder-btn:hover { background-color: color-mix(in srgb, #e3e3e3 8%, transparent); color: #e3e3e3; }
 
 		.conversation-items-container, gem-nav-list-item { cursor: grab; }
 
@@ -509,45 +610,124 @@ module.exports = Ferdium => {
 		return null;
 	}
 
-	function initializeFolders() {
-		const foldersContainerId = 'folder-ui-container';
-		if (document.getElementById(foldersContainerId)) return true;
+	function findSidebarSections() {
+		let notebooksSection = null;
 
-		// Find insertion target: chat header or conversations list / section
-		let recentHeader = document.querySelector('#sidenav-section-header-chats, [aria-controls="sidenav-section-content-chats"]');
-		if (!recentHeader) {
-			const headers = document.querySelectorAll('button.expandable-section-header, div.expandable-section-header, .expandable-section-header');
-			if (headers.length >= 2) {
-				recentHeader = headers[1];
-			} else if (headers.length === 1) {
-				recentHeader = headers[0];
+		// 1. Search for Notebooks section container
+		const allHeaders = document.querySelectorAll('.expandable-section-header, button[aria-controls], [data-test-id*="section"]');
+		for (const h of allHeaders) {
+			const text = (h.textContent || '').trim().toLowerCase();
+			if (text.includes('notebook') && !h.closest('#folder-ui-container')) {
+				notebooksSection = h.closest('expandable-section, .expandable-section') || h.parentElement;
+				break;
 			}
 		}
 
-		if (!recentHeader) {
-			const fallbackList = document.querySelector('conversations-list, #sidenav-section-content-chats, mat-nav-list, gem-nav-list, .conversations-list');
-			if (!fallbackList) return false;
-			recentHeader = fallbackList;
+		if (!notebooksSection) {
+			const notebookBtn = document.querySelector('a[href*="notebook"], button[aria-label*="Notebook"], [data-test-id*="notebook"]');
+			if (notebookBtn && !notebookBtn.closest('#folder-ui-container')) {
+				notebooksSection = notebookBtn.closest('expandable-section, .expandable-section, mat-nav-list, .section') || notebookBtn.parentElement;
+			}
 		}
 
-		const container = document.createElement('div');
-		container.setAttribute('storagekey', 'folders-mod');
-		container.id = foldersContainerId;
-		recentHeader.parentNode.insertBefore(container, recentHeader);
-		renderFolders();
+		// 2. Search for Recent chats section container
+		let recentSection = null;
+		const chatHeader = document.querySelector('#sidenav-section-header-chats, [aria-controls="sidenav-section-content-chats"]');
+		if (chatHeader) {
+			recentSection = chatHeader.closest('expandable-section, .expandable-section') || chatHeader;
+		}
+
+		if (!recentSection) {
+			const convoList = document.querySelector('conversations-list, #sidenav-section-content-chats');
+			if (convoList) {
+				recentSection = convoList.closest('expandable-section, .expandable-section') || convoList;
+			}
+		}
+
+		if (!recentSection) {
+			for (const h of allHeaders) {
+				const text = (h.textContent || '').trim().toLowerCase();
+				if ((text.includes('letzte') || text.includes('recent') || text.includes('unterhaltungen')) && !h.closest('#folder-ui-container')) {
+					recentSection = h.closest('expandable-section, .expandable-section') || h;
+					break;
+				}
+			}
+		}
+
+		return { notebooksSection, recentSection };
+	}
+
+	function positionFolderContainer(container) {
+		if (!container) return false;
+		const { notebooksSection, recentSection } = findSidebarSections();
+
+		// Priority 1: Insert immediately AFTER the Notebooks section
+		if (notebooksSection && notebooksSection.parentNode) {
+			const parent = notebooksSection.parentNode;
+			const targetNext = notebooksSection.nextSibling;
+			if (container.parentNode !== parent || container.previousSibling !== notebooksSection) {
+				parent.insertBefore(container, targetNext);
+				console.log("Gemini Mod: Positioned folders container after Notebooks section.");
+			}
+			return true;
+		}
+
+		// Priority 2: Insert immediately BEFORE the Recent chats section
+		if (recentSection && recentSection.parentNode) {
+			const parent = recentSection.parentNode;
+			if (container.parentNode !== parent || container.nextSibling !== recentSection) {
+				parent.insertBefore(container, recentSection);
+				console.log("Gemini Mod: Positioned folders container before Recent section.");
+			}
+			return true;
+		}
+
+		return false;
+	}
+
+	function initializeFolders() {
+		const foldersContainerId = 'folder-ui-container';
+		let container = document.getElementById(foldersContainerId);
+
+		if (!container) {
+			container = document.createElement('div');
+			container.setAttribute('storagekey', 'folders-mod');
+			container.id = foldersContainerId;
+		}
+
+		const positioned = positionFolderContainer(container);
+		if (!positioned) {
+			return false; // Wait until Notebooks or Recent section is available
+		}
+
+		if (!container.hasChildNodes()) {
+			renderFolders();
+		}
 
 		const chatHistoryList = document.querySelector('conversations-list, #sidenav-section-content-chats, mat-nav-list, gem-nav-list, .conversations-list');
-		if (chatHistoryList) {
+		if (chatHistoryList && !chatHistoryList.dataset.geminiModObserved) {
+			chatHistoryList.dataset.geminiModObserved = 'true';
 			let debounceTimer = null;
 			const observer = new MutationObserver(() => {
 				clearTimeout(debounceTimer);
 				debounceTimer = setTimeout(() => {
 					processConversationItems(chatHistoryList);
+					positionFolderContainer(container);
 				}, 100);
 			});
 			observer.observe(chatHistoryList, { childList: true, subtree: true });
 			processConversationItems(chatHistoryList);
 		}
+
+		const sidebarParent = container.parentElement;
+		if (sidebarParent && !sidebarParent.dataset.geminiModPosObserved) {
+			sidebarParent.dataset.geminiModPosObserved = 'true';
+			const posObserver = new MutationObserver(() => {
+				positionFolderContainer(container);
+			});
+			posObserver.observe(sidebarParent, { childList: true });
+		}
+
 		return true;
 	}
 
@@ -714,9 +894,9 @@ module.exports = Ferdium => {
 		});
 		controls.appendChild(settingsBtn);
 
-		const toggleIcon = document.createElement('span');
-		toggleIcon.className = 'folder-toggle-icon';
-		toggleIcon.textContent = '▼';
+		const toggleIcon = document.createElement('mat-icon');
+		toggleIcon.className = 'mat-icon notranslate lm-icon-s lumi-symbols mat-ligature-font mat-icon-no-color folder-toggle-icon';
+		toggleIcon.textContent = isOpen ? 'keyboard_arrow_down' : 'keyboard_arrow_right';
 		controls.appendChild(toggleIcon);
 
 		header.appendChild(controls);
@@ -727,6 +907,7 @@ module.exports = Ferdium => {
 			folder.isClosed = !folder.isOpen;
 			folderDiv.classList.toggle('closed', !folder.isOpen);
 			matIcon.textContent = folder.isOpen ? 'folder_open' : 'folder';
+			toggleIcon.textContent = folder.isOpen ? 'keyboard_arrow_down' : 'keyboard_arrow_right';
 			saveFolderConfiguration();
 		});
 
