@@ -1,12 +1,27 @@
-// bridge.js
-// This script runs in the MAIN WORLD (Same as Monaco, jsPDF, Sortable)
+// Restore environment after UMD libraries have attached to window
+try {
+    if (typeof window._temp_define !== 'undefined') {
+        window.define = window._temp_define;
+        delete window._temp_define;
+    }
+    if (typeof window._temp_module !== 'undefined') {
+        window.module = window._temp_module;
+        delete window._temp_module;
+    }
+    if (typeof window._temp_exports !== 'undefined') {
+        window.exports = window._temp_exports;
+        delete window._temp_exports;
+    }
+} catch (e) {
+    console.warn("Gemini Mod Bridge: Global cleanup notice:", e);
+}
 
-console.log("Gemini Mod: Bridge script loaded (v3 - Restored).");
+console.log("Gemini Mod: Bridge script loaded (v4 - Optimized).");
 
 const Bridge = {
     // --- Editor & Content Helpers ---
     getMonacoEditor: function () {
-        if (typeof window.monaco === 'undefined') return null;
+        if (typeof window.monaco === 'undefined' || !window.monaco.editor) return null;
         const editors = window.monaco.editor.getEditors();
 
         // Priority 1: Editor inside code-immersive-panel (Code Canvas)
@@ -24,14 +39,12 @@ const Bridge = {
     },
 
     getGeminiContent: function () {
-        // 1. Try Monaco
+        // 1. Try Monaco Editor directly
         const editor = this.getMonacoEditor();
         if (editor) {
             const model = editor.getModel();
             if (model) {
-                // Try to find a title
                 let title = "code_snippet";
-                // Strategy 1: specific filename header
                 const parentPanel = editor.getContainerDomNode().closest('code-immersive-panel');
                 if (parentPanel) {
                     const header = parentPanel.querySelector('h2, [data-test-id="canvas-title"], .title, .filename');
@@ -39,7 +52,6 @@ const Bridge = {
                         title = header.textContent.trim();
                     }
                 }
-                // Strategy 2: Fallback title
                 if (title === "code_snippet") {
                     const broadTitle = document.querySelector('code-immersive-panel h2');
                     if (broadTitle && broadTitle.textContent.trim()) {
@@ -50,8 +62,53 @@ const Bridge = {
             }
         }
 
-        // 2. Try Standard Text Response (Fallback)
-        const modelResponses = document.querySelectorAll('.model-response-text');
+        // 2. Try ProseMirror (Document Editor)
+        const pmEditor = document.querySelector('.ProseMirror');
+        if (pmEditor) {
+            const titleEl = document.querySelector('h2.title-text, [data-test-id="canvas-title"], .title');
+            const title = titleEl ? titleEl.textContent.trim() : "gemini_document";
+            if (pmEditor.pmView && pmEditor.pmView.state && pmEditor.pmView.state.doc) {
+                try {
+                    return { type: 'text', content: pmEditor.pmView.state.doc.textContent, title };
+                } catch (e) {
+                    console.warn("Gemini Mod Bridge: Failed to read ProseMirror state:", e);
+                }
+            }
+            if (pmEditor.innerText && pmEditor.innerText.trim()) {
+                return { type: 'text', content: pmEditor.innerText.trim(), title };
+            }
+        }
+
+        // 3. Fallback: DOM extraction from immersive panels
+        const panels = document.querySelectorAll('code-immersive-panel, immersive-panel, .immersive-panel-container');
+        for (const panel of panels) {
+            const checkRoot = (root) => {
+                if (!root) return null;
+                const titleEl = root.querySelector('h2.title-text, .title, [data-test-id="canvas-title"]');
+                const title = titleEl ? titleEl.textContent.trim() : "gemini_artifact";
+
+                const monacoEditor = root.querySelector('.monaco-editor');
+                if (monacoEditor) {
+                    const viewLines = monacoEditor.querySelector('.view-lines');
+                    if (viewLines) return { type: 'code', content: viewLines.innerText, title };
+                }
+                const codeBlock = root.querySelector('code, pre');
+                if (codeBlock) return { type: 'code', content: codeBlock.textContent, title };
+                const textEditor = root.querySelector('.ProseMirror, [contenteditable="true"]');
+                if (textEditor) return { type: 'text', content: textEditor.innerText, title };
+                return null;
+            };
+
+            if (panel.shadowRoot) {
+                const res = checkRoot(panel.shadowRoot);
+                if (res) return res;
+            }
+            const res = checkRoot(panel);
+            if (res) return res;
+        }
+
+        // 4. Try Standard Text Response (Fallback)
+        const modelResponses = document.querySelectorAll('.model-response-text, message-content, .response-content');
         if (modelResponses.length > 0) {
             const lastResponse = modelResponses[modelResponses.length - 1];
             return { type: 'text', content: lastResponse.innerText, title: 'gemini_response' };
@@ -62,35 +119,30 @@ const Bridge = {
     // --- Actions ---
     actions: {
         copy: async function () {
+            const data = Bridge.getGeminiContent();
+            if (!data || !data.content) {
+                console.warn("Gemini Mod Bridge: No content to copy");
+                return;
+            }
             try {
-                // Use getGeminiContent() instead of editor.trigger
-                const data = Bridge.getGeminiContent();
-                if (data && data.content) {
-                    try { window.focus(); } catch (e) { }
-                    await navigator.clipboard.writeText(data.content);
-                    console.log("Gemini Mod Bridge: Copied via Clipboard API");
-                } else {
-                    console.warn("Gemini Mod Bridge: No content to copy");
-                }
+                try { window.focus(); } catch (e) { }
+                await navigator.clipboard.writeText(data.content);
+                console.log("Gemini Mod Bridge: Copied via Clipboard API");
             } catch (e) {
-                console.error("Gemini Mod Bridge: Copy Failed", e);
-                // Fallback: execCommand
+                console.error("Gemini Mod Bridge: Clipboard API copy failed, using fallback:", e);
                 try {
-                    const data = Bridge.getGeminiContent();
-                    if (data && data.content) {
-                        const textArea = document.createElement("textarea");
-                        textArea.value = data.content;
-                        textArea.style.position = "fixed";
-                        textArea.style.left = "-9999px";
-                        document.body.appendChild(textArea);
-                        textArea.focus();
-                        textArea.select();
-                        document.execCommand('copy');
-                        document.body.removeChild(textArea);
-                        console.log("Gemini Mod Bridge: Copied via execCommand");
-                    }
+                    const textArea = document.createElement("textarea");
+                    textArea.value = data.content;
+                    textArea.style.position = "fixed";
+                    textArea.style.left = "-9999px";
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    console.log("Gemini Mod Bridge: Copied via execCommand");
                 } catch (err) {
-                    // Silent fail or alert
+                    console.error("Gemini Mod Bridge: ExecCommand fallback failed:", err);
                 }
             }
         },
@@ -160,45 +212,6 @@ const Bridge = {
             } catch (e) {
                 console.error("Gemini Mod Bridge: PDF Failed", e);
             }
-        },
-
-        initSortable: function (detail) {
-            const { selector, options } = detail;
-            if (typeof window.Sortable === 'undefined') return;
-            const el = document.querySelector(selector);
-            if (!el) return;
-
-            if (window.Sortable.get(el)) {
-                try {
-                    window.Sortable.get(el).destroy();
-                } catch (e) {}
-            }
-
-            const defaultOptions = {
-                animation: 150,
-                delay: 100,
-                delayOnTouchOnly: true,
-                onEnd: function (evt) {
-                    const newOrder = [];
-                    for (let i = 0; i < el.children.length; i++) {
-                        if (el.children[i].dataset.folderId) {
-                            newOrder.push(el.children[i].dataset.folderId);
-                        }
-                    }
-                    document.dispatchEvent(new CustomEvent('GEMINI_SORT_UPDATE', {
-                        detail: { newOrder: newOrder, container: selector }
-                    }));
-                },
-                onAdd: function (evt) {
-                    document.dispatchEvent(new CustomEvent('GEMINI_SORT_UPDATE', {
-                        detail: { newOrder: [], container: selector }
-                    }));
-                }
-            };
-            const finalOptions = { ...defaultOptions, ...options };
-            finalOptions.onEnd = defaultOptions.onEnd;
-            finalOptions.onAdd = defaultOptions.onAdd;
-            new window.Sortable(el, finalOptions);
         }
     }
 };
@@ -207,9 +220,5 @@ const Bridge = {
 document.addEventListener('GEMINI_ACTION_COPY', () => Bridge.actions.copy());
 document.addEventListener('GEMINI_ACTION_DOWNLOAD', () => Bridge.actions.download());
 document.addEventListener('GEMINI_ACTION_PDF', () => Bridge.actions.pdf());
-
-document.addEventListener('GEMINI_INIT_SORTABLE', (e) => {
-    if (e.detail) Bridge.actions.initSortable(e.detail);
-});
 
 console.log("Gemini Mod: Bridge events attached.");

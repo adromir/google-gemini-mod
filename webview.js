@@ -19,27 +19,11 @@ module.exports = Ferdium => {
 	const STORAGE_KEY_FOLDERS = 'ferdiumGeminiModFolders';
 	const STORAGE_KEY_CONVO_FOLDERS = 'ferdiumGeminiModConvoFolders';
 
-	// --- Toolbar UI Labels ---
-	const SETTINGS_BUTTON_LABEL = "⚙️ Settings";
-
 	// --- CSS Selectors ---
-
-
-
 	const GEMINI_INPUT_FIELD_SELECTORS = ['div[role="textbox"]', '.ql-editor p', '.ql-editor', 'div[contenteditable="true"]'];
 	const FOLDER_CHAT_ITEM_SELECTOR = 'gem-nav-list-item, div[data-test-id="conversation"]';
-	const FOLDER_CHAT_CONTAINER_SELECTOR = 'gem-nav-list-item, .conversation-items-container';
 	const FOLDER_CHAT_LIST_CONTAINER_SELECTOR = 'conversations-list mat-nav-list, mat-nav-list, conversations-list .conversations-container';
 	const FOLDER_INJECTION_POINT_SELECTOR = '#sidenav-section-content-chats, conversations-list, div.chat-history-list, .conversations-list';
-
-	// --- Download Feature Configuration ---
-	const DEFAULT_DOWNLOAD_EXTENSION = "txt";
-
-	// --- Filename Sanitization Regex ---
-	// eslint-disable-next-line no-control-regex
-	const INVALID_FILENAME_CHARS_REGEX = /[<>:"/\\|?*\x00-\x1F]/g;
-	const RESERVED_WINDOWS_NAMES_REGEX = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
-	const FILENAME_WITH_EXT_REGEX = /^(.+)\.([a-zA-Z0-9]{1,8})$/;
 
 	// --- Default Definitions ---
 	const defaultToolbarItems = [
@@ -65,11 +49,6 @@ module.exports = Ferdium => {
 	let folders = [];
 	let conversationFolders = {};
 	const FOLDER_COLORS = ['#370000', '#0D3800', '#001B38', '#383200', '#380031', '#7DAC89', '#7A82AF', '#AC7D98', '#7AA7AF', '#9CA881'];
-
-	// Helper to get window object with libraries (handling potential isolation)
-	function getPageWindow() {
-		return window;
-	}
 
 	if (!Sortable && typeof window !== 'undefined' && window.Sortable) {
 		Sortable = window.Sortable;
@@ -221,13 +200,25 @@ module.exports = Ferdium => {
 			line-height: 1.25rem;
 		}
 		#folder-section-header .toggle-icon {
-			display: flex;
+			display: inline-flex;
 			align-items: center;
 			justify-content: center;
+			width: 20px;
+			height: 20px;
 			flex-shrink: 0;
 			margin-left: auto;
 			color: #c4c7c5;
-			font-size: 18px;
+			transition: color 0.15s ease;
+		}
+		#folder-section-header .toggle-icon svg {
+			display: block;
+			transition: transform 0.2s ease;
+		}
+		#folder-section-header.collapsed .toggle-icon svg {
+			transform: rotate(-90deg) !important;
+		}
+		#folder-section-header:not(.collapsed) .toggle-icon svg {
+			transform: rotate(0deg) !important;
 		}
 		#folder-section-header:hover .toggle-icon {
 			color: #e3e3e3;
@@ -300,6 +291,11 @@ module.exports = Ferdium => {
 		.folder-header:hover {
 			background-color: rgba(227, 227, 227, 0.08) !important;
 		}
+		.folder-header.folder-drag-over {
+			background-color: rgba(227, 227, 227, 0.16) !important;
+			outline: 1px dashed #a8c7fa !important;
+			outline-offset: -1px;
+		}
 		.folder-name {
 			flex: 1;
 			min-width: 0;
@@ -309,12 +305,13 @@ module.exports = Ferdium => {
 			margin-left: 0;
 			padding-right: 8px;
 			font-size: 0.875rem;
+			color: #e3e3e3 !important;
 		}
 
 		.folder-controls {
-			display: flex;
+			display: flex !important;
 			align-items: center;
-			gap: 4px;
+			gap: 2px;
 			flex-shrink: 0;
 			margin-left: auto;
 		}
@@ -327,13 +324,13 @@ module.exports = Ferdium => {
 			border-radius: 50% !important;
 			width: 24px;
 			height: 24px;
-			display: flex;
+			display: inline-flex;
 			align-items: center;
 			justify-content: center;
 			font-size: 1.1em;
 			line-height: 1;
 			opacity: 0;
-			transition: opacity 0.15s, background-color 0.15s;
+			transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease;
 		}
 		.folder-header:hover .folder-options-btn {
 			opacity: 1;
@@ -344,17 +341,25 @@ module.exports = Ferdium => {
 		}
 
 		.folder-toggle-icon {
-			display: flex;
+			display: inline-flex;
 			align-items: center;
 			justify-content: center;
 			width: 20px;
 			height: 20px;
-			transition: transform 0.2s;
+			flex-shrink: 0;
 			color: #c4c7c5;
-			font-size: 16px;
+			transition: color 0.15s ease;
+			cursor: pointer;
 		}
-		.folder.closed .folder-toggle-icon {
-			transform: rotate(-90deg);
+		.folder-toggle-icon svg {
+			display: block;
+			transition: transform 0.2s ease;
+		}
+		.folder.closed .folder-toggle-icon svg {
+			transform: rotate(-90deg) !important;
+		}
+		.folder:not(.closed) .folder-toggle-icon svg {
+			transform: rotate(0deg) !important;
 		}
 		.folder-header:hover .folder-toggle-icon {
 			color: #e3e3e3;
@@ -368,7 +373,7 @@ module.exports = Ferdium => {
 			transition: max-height 0.25s ease-in-out;
 		}
 		.folder.closed .folder-content {
-			max-height: 0;
+			max-height: 0 !important;
 		}
 
 		/* Chat items inside folders - match gem-nav-list-item look */
@@ -731,6 +736,40 @@ module.exports = Ferdium => {
 		return true;
 	}
 
+	function createChevronSvg(isOpen = true) {
+		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+		svg.setAttribute('viewBox', '0 0 24 24');
+		svg.setAttribute('width', '18');
+		svg.setAttribute('height', '18');
+		svg.setAttribute('fill', 'currentColor');
+		svg.setAttribute('aria-hidden', 'true');
+		svg.style.display = 'block';
+		svg.style.transition = 'transform 0.2s ease';
+		svg.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
+		svg.innerHTML = '<path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>';
+		return svg;
+	}
+
+	let activeDraggedConvoItem = null;
+
+	document.addEventListener('dragstart', (e) => {
+		const item = e.target.closest(FOLDER_CHAT_ITEM_SELECTOR) || e.target.closest('.conversation-items-container');
+		if (item) {
+			activeDraggedConvoItem = item;
+			if (e.dataTransfer) {
+				e.dataTransfer.setData('text/plain', getConversationId(item) || '');
+				e.dataTransfer.effectAllowed = 'move';
+			}
+		}
+	}, true);
+
+	document.addEventListener('dragend', () => {
+		setTimeout(() => { activeDraggedConvoItem = null; }, 100);
+		document.querySelectorAll('.folder-header.folder-drag-over, .folder.folder-drag-over').forEach(el => {
+			el.classList.remove('folder-drag-over');
+		});
+	}, true);
+
 	function renderFolders() {
 		const container = document.getElementById('folder-ui-container');
 		if (!container) return;
@@ -758,17 +797,11 @@ module.exports = Ferdium => {
 		sectionLabel.textContent = 'Folders';
 		if (headerScope) sectionLabel.setAttribute(headerScope, '');
 
-		const sectionChevron = document.createElement('gem-icon');
+		const sectionChevron = document.createElement('span');
 		sectionChevron.className = 'toggle-icon';
 		sectionChevron.setAttribute('data-test-id', 'expandable-section-toggle-icon');
 		if (headerScope) sectionChevron.setAttribute(headerScope, '');
-
-		const chevronIcon = document.createElement('mat-icon');
-		chevronIcon.className = 'mat-icon notranslate lm-icon-s lumi-symbols mat-ligature-font mat-icon-no-color';
-		chevronIcon.setAttribute('role', 'img');
-		chevronIcon.setAttribute('aria-hidden', 'true');
-		chevronIcon.textContent = isSectionOpen ? 'keyboard_arrow_down' : 'keyboard_arrow_right';
-		sectionChevron.appendChild(chevronIcon);
+		sectionChevron.appendChild(createChevronSvg(isSectionOpen));
 
 		sectionHeader.appendChild(sectionLabel);
 		sectionHeader.appendChild(sectionChevron);
@@ -798,8 +831,8 @@ module.exports = Ferdium => {
 			const nowCollapsed = sectionHeader.classList.toggle('collapsed');
 			sectionHeader.setAttribute('aria-expanded', nowCollapsed ? 'false' : 'true');
 			folderWrapper.style.maxHeight = nowCollapsed ? '0px' : '2000px';
-			const newChevron = nowCollapsed ? 'keyboard_arrow_right' : 'keyboard_arrow_down';
-			chevronIcon.textContent = newChevron;
+			const svg = sectionChevron.querySelector('svg');
+			if (svg) svg.style.transform = nowCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
 			localStorage.setItem(STORAGE_KEY_SECTION_OPEN, (!nowCollapsed).toString());
 		});
 
@@ -894,9 +927,9 @@ module.exports = Ferdium => {
 		});
 		controls.appendChild(settingsBtn);
 
-		const toggleIcon = document.createElement('mat-icon');
-		toggleIcon.className = 'mat-icon notranslate lm-icon-s lumi-symbols mat-ligature-font mat-icon-no-color folder-toggle-icon';
-		toggleIcon.textContent = isOpen ? 'keyboard_arrow_down' : 'keyboard_arrow_right';
+		const toggleIcon = document.createElement('span');
+		toggleIcon.className = 'folder-toggle-icon';
+		toggleIcon.appendChild(createChevronSvg(isOpen));
 		controls.appendChild(toggleIcon);
 
 		header.appendChild(controls);
@@ -907,9 +940,83 @@ module.exports = Ferdium => {
 			folder.isClosed = !folder.isOpen;
 			folderDiv.classList.toggle('closed', !folder.isOpen);
 			matIcon.textContent = folder.isOpen ? 'folder_open' : 'folder';
-			toggleIcon.textContent = folder.isOpen ? 'keyboard_arrow_down' : 'keyboard_arrow_right';
+			const svg = toggleIcon.querySelector('svg');
+			if (svg) svg.style.transform = folder.isOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
 			saveFolderConfiguration();
 		});
+
+		// Drag & drop onto folder header (allows dropping to closed folder or open folder)
+		let autoOpenTimer = null;
+
+		function handleDragOver(e) {
+			if (!activeDraggedConvoItem) return;
+			e.preventDefault();
+			e.stopPropagation();
+			if (e.dataTransfer) {
+				e.dataTransfer.dropEffect = 'move';
+			}
+			header.classList.add('folder-drag-over');
+
+			const isClosed = folderDiv.classList.contains('closed') || !folder.isOpen;
+			if (isClosed && !autoOpenTimer) {
+				autoOpenTimer = setTimeout(() => {
+					if (folderDiv.classList.contains('closed') || !folder.isOpen) {
+						folder.isOpen = true;
+						folder.isClosed = false;
+						folderDiv.classList.remove('closed');
+						matIcon.textContent = 'folder_open';
+						const svg = toggleIcon.querySelector('svg');
+						if (svg) svg.style.transform = 'rotate(0deg)';
+						saveFolderConfiguration();
+					}
+				}, 500);
+			}
+		}
+
+		function handleDragLeave(e) {
+			if (!header.contains(e.relatedTarget) && !folderDiv.contains(e.relatedTarget)) {
+				header.classList.remove('folder-drag-over');
+				if (autoOpenTimer) {
+					clearTimeout(autoOpenTimer);
+					autoOpenTimer = null;
+				}
+			}
+		}
+
+		function handleDrop(e) {
+			if (!activeDraggedConvoItem) return;
+			e.preventDefault();
+			e.stopPropagation();
+			header.classList.remove('folder-drag-over');
+			if (autoOpenTimer) {
+				clearTimeout(autoOpenTimer);
+				autoOpenTimer = null;
+			}
+
+			const item = activeDraggedConvoItem;
+			const convoId = getConversationId(item);
+			if (convoId) {
+				conversationFolders[convoId] = folder.id;
+				saveFolderConfiguration();
+			}
+
+			contentDiv.appendChild(item);
+
+			if (folderDiv.classList.contains('closed') || !folder.isOpen) {
+				folder.isOpen = true;
+				folder.isClosed = false;
+				folderDiv.classList.remove('closed');
+				matIcon.textContent = 'folder_open';
+				const svg = toggleIcon.querySelector('svg');
+				if (svg) svg.style.transform = 'rotate(0deg)';
+				saveFolderConfiguration();
+			}
+		}
+
+		header.addEventListener('dragenter', handleDragOver);
+		header.addEventListener('dragover', handleDragOver);
+		header.addEventListener('dragleave', handleDragLeave);
+		header.addEventListener('drop', handleDrop);
 
 		folderDiv.appendChild(header);
 
@@ -923,6 +1030,13 @@ module.exports = Ferdium => {
 			new Sortable(contentDiv, {
 				group: 'conversations',
 				animation: 150,
+				onStart: (evt) => {
+					activeDraggedConvoItem = evt.item;
+				},
+				onEnd: () => {
+					setTimeout(() => { activeDraggedConvoItem = null; }, 100);
+					document.querySelectorAll('.folder-header.folder-drag-over').forEach(el => el.classList.remove('folder-drag-over'));
+				},
 				onAdd: (evt) => {
 					const item = evt.item;
 					const convoId = getConversationId(item);
@@ -1063,6 +1177,13 @@ module.exports = Ferdium => {
 			new Sortable(mainList, {
 				group: 'conversations',
 				animation: 150,
+				onStart: (evt) => {
+					activeDraggedConvoItem = evt.item;
+				},
+				onEnd: () => {
+					setTimeout(() => { activeDraggedConvoItem = null; }, 100);
+					document.querySelectorAll('.folder-header.folder-drag-over').forEach(el => el.classList.remove('folder-drag-over'));
+				},
 				onAdd: (evt) => {
 					const item = evt.item;
 					const convoId = getConversationId(item);
@@ -1737,17 +1858,22 @@ module.exports = Ferdium => {
 					createToolbar();
 					createSettingsPanel();
 
-					// Start folder initialization loop
+					// Start folder initialization loop with backoff
 					let attempts = 0;
-					const folderInitInterval = setInterval(() => {
+					let folderInitInterval = setInterval(() => {
 						attempts++;
 						if (initializeFolders()) {
 							clearInterval(folderInitInterval);
 							console.log("Ferdium Gemini Mod: Folders Initialized.");
-						}
-						if (attempts > 60) { // Stop after 30 seconds (60 * 500ms)
+						} else if (attempts === 60) {
+							// After 30s of rapid checks, switch to gentle backoff (every 2.5s) instead of terminating
 							clearInterval(folderInitInterval);
-							console.warn("Ferdium Gemini Mod: Folder initialization timed out.");
+							folderInitInterval = setInterval(() => {
+								if (initializeFolders()) {
+									clearInterval(folderInitInterval);
+									console.log("Ferdium Gemini Mod: Folders Initialized (delayed).");
+								}
+							}, 2500);
 						}
 					}, 500);
 
